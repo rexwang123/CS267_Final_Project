@@ -39,7 +39,7 @@ class Layer {
 // Utility CUDA kernel functions
 __device__ float sigmoid(float v);
 __global__ void apply_sigmoid(float *input, float *output, const int N);
-__global__ void makeError(float err[batch_size][10], float output[batch_size][10], unsigned int Y[batch_size], const int N);
+__global__ void makeError(float* err, float* output, unsigned int Y[batch_size], const int N);
 __global__ void apply_grad(float *output, float *grad, const int N);
 
 // Forward propagation kernels

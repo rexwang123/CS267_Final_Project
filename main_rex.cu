@@ -6,7 +6,8 @@
 #include <cuda.h>
 #include <cstdio>
 #include <time.h>
-
+#include <iostream>
+#include <string>
 static mnist_data *train_set, *test_set;
 static unsigned int train_cnt, test_cnt;
 
@@ -21,7 +22,7 @@ static Layer l_f = Layer(6*6*6, 10, 10 * batch_size);
 static Layer l_r = Layer(4*4,1,6*6*6 * batch_size);
 
 static void learn();
-static unsigned int* classify(float input[batch_size][28][28]);
+static int* classify(float input[batch_size][28][28]);
 static void test();
 static double forward_pass(float input[batch_size][28][28]);
 static double back_pass();
@@ -174,7 +175,6 @@ static double back_pass()
 	bp_bias_c2<<<512, 256>>>(l_c2.bias, (float (*)[6][12][12])l_c2.d_preact);
 
 	
-	
 	bp_output_c1<<<512, 256>>>((float (*)[6][24][24])l_c1.d_output, (float (*)[2][2])l_c2.weight, (float (*)[6][12][12])l_c2.d_preact);
 	bp_preact_c1<<<512, 256>>>((float (*)[6][24][24])l_c1.d_preact, (float (*)[6][24][24])l_c1.d_output, (float (*)[6][24][24])l_c1.preact);
 	bp_weight_c1<<<512, 256>>>((float (*)[5][5])l_c1.d_weight, (float (*)[6][24][24])l_c1.d_preact, (float (*)[28][28])l_input.output);
@@ -219,6 +219,9 @@ static void learn()
 
 	fprintf(stdout ,"Learning\n");
 
+	unsigned int* Y;
+	cudaMalloc(&Y, sizeof(unsigned int) * batch_size);
+
 	while (iter < 0 || iter-- > 0) {
 		err = 0.0f;
 		
@@ -227,37 +230,34 @@ static void learn()
 			float tmp_err;
 
 			float input[batch_size][28][28];
-			unsigned int Y[batch_size];
+			unsigned int Y_host[batch_size];
+
 			for(int k = 0; k < batch_size; k++){
 				for (int i = 0; i < 28; ++i) {
 					for (int j = 0; j < 28; ++j) {
 						input[k][i][j] = (train_set[p * batch_size + k].data)[i][j];
-	
 					}
 				}
-				Y[k] = train_set[p * batch_size + k].label;
+				Y_host[k] = train_set[p * batch_size + k].label;
 			}
 			time_taken += forward_pass(input);
-			
-			fprintf(stdout, "\n finish forward %d / %d \n", p+1, batch_cnt);
 
 			l_f.bp_clear();
-			// fprintf(stdout, "\n here1 \n");
 			l_c2.bp_clear();
-			// fprintf(stdout, "\n here2 \n ");
 			l_c1.bp_clear();
-			// fprintf(stdout, "\n here3 \n ");
 			l_c3.bp_clear();
-			// Euclid distance of train_set[i]
 			
-			fprintf(stdout, "\n here4 \n ");
-			makeError<<<10, batch_size>>>((float (*)[10]) l_f.d_preact, (float (*)[10]) l_f.output, Y, 10 * batch_size);
-			//fprintf(stdout, "\n here \n");
+
+			cudaMemset(Y, 0, sizeof(unsigned int) * batch_size);
+			cudaMemcpy(Y, Y_host, sizeof(unsigned int) * batch_size, cudaMemcpyHostToDevice);
+			makeError<<<batch_size, 10>>>(l_f.d_preact, l_f.output, Y, 10 * batch_size);
+	
 			cublasSnrm2(blas, 10 * batch_size, l_f.d_preact, 1, &tmp_err);
 			err += tmp_err;
 
-			//time_taken += back_pass();
-			// fprintf(stdout, "\n finish backward %d / %d \n", p+1, batch_cnt);
+			time_taken += back_pass();
+
+			//fprintf(stdout, "\n %f \n", tmp_err);
 		}
 
 		fprintf(stdout, "\n finish iter %d \n", iter);
@@ -265,38 +265,39 @@ static void learn()
 		double accuracy = 100 - double(err) * 100.0;
 		fprintf(stdout, "accuracy: %.2lf%% , time_on_gpu: %lf sec\n", accuracy, time_taken);
 
+		break;
 		if (err < threshold) {
 			fprintf(stdout, "Training complete, error less than threshold\n\n");
 			break;
 		}
-
-		
 	}
+
+	cudaFree(Y);
 	
 	fprintf(stdout, "\n Time - %lf s\n", time_taken);
 }
 
 
 // Returns label of given data (0-9)
-static unsigned* classify(float input[batch_size][28][28])
+static int* classify(float input[batch_size][28][28])
 {
 	float res[batch_size * 10];
 
 	forward_pass(input);
 
-	unsigned int* max = new unsigned int[batch_size];
+	int* max = new int[batch_size]{0};
 
-	cudaMemcpy(res, l_f.output, sizeof(float) * 10 * test_cnt, cudaMemcpyDeviceToHost);
+	cudaMemcpy(&res[0], l_f.output, sizeof(float) * 10 * batch_size, cudaMemcpyDeviceToHost);
 
+	
 	for(int j = 0; j < batch_size; j++){
-		for (int i = 1; i < 10; ++i) {
+		for (int i = 0; i < 10; i++) {
 			if (res[10 * j + max[j]] < res[10 * j + i]) {
 				max[j] = i;
 			}
 		}
 	}
 	
-
 	return max;
 }
 
@@ -316,7 +317,7 @@ static void test()
 			}
 		}
 
-		unsigned int* max = classify(input);
+		int* max = classify(input);
 		for (int i = 0; i < batch_size; ++i) {
 			if (max[i] != test_set[batch_size * p + i].label) {
 				++error;
