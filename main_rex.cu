@@ -78,51 +78,51 @@ static double forward_pass(float input[batch_size][28][28])
 
 	l_input.setOutput((float *)input);
 	
-	// fp_preact_c1<<<512, 256>>>((float (*)[28])l_input.output, (float (*)[24][24])l_c1.preact, (float (*)[5][5])l_c1.weight);
-	// fp_bias_c1<<<512, 256>>>((float (*)[24][24])l_c1.preact, l_c1.bias);
-	// apply_sigmoid<<<512, 256>>>(l_c1.preact, l_c1.output, l_c1.O);
+	// fp_preact_c1<<<2048,1024>>>((float (*)[28])l_input.output, (float (*)[24][24])l_c1.preact, (float (*)[5][5])l_c1.weight);
+	// fp_bias_c1<<<2048,1024>>>((float (*)[24][24])l_c1.preact, l_c1.bias);
+	// apply_sigmoid<<<2048,1024>>>(l_c1.preact, l_c1.output, l_c1.O);
 
-	// fp_preact_r<<<512, 256>>>((float (*)[24][24])l_c1.preact, (float (*)[6][6])l_r.preact, (float (*)[4][4])l_r.weight);
-	// fp_bias_r<<<512, 256>>>((float (*)[6][6])l_r.preact, l_r.bias);
+	// fp_preact_r<<<2048,1024>>>((float (*)[24][24])l_c1.preact, (float (*)[6][6])l_r.preact, (float (*)[4][4])l_r.weight);
+	// fp_bias_r<<<2048,1024>>>((float (*)[6][6])l_r.preact, l_r.bias);
 
-	// fp_preact_c2<<<512, 256>>>((float (*)[24][24])l_c1.output, (float (*)[12][12])l_c2.preact, (float (*)[2][2])l_c2.weight);
-	// fp_bias_c2<<<512, 256>>>((float (*)[12][12])l_c2.preact, l_c2.bias);
-	// apply_sigmoid<<<512, 256>>>(l_c2.preact, l_c2.output, l_c2.O);
+	// fp_preact_c2<<<2048,1024>>>((float (*)[24][24])l_c1.output, (float (*)[12][12])l_c2.preact, (float (*)[2][2])l_c2.weight);
+	// fp_bias_c2<<<2048,1024>>>((float (*)[12][12])l_c2.preact, l_c2.bias);
+	// apply_sigmoid<<<2048,1024>>>(l_c2.preact, l_c2.output, l_c2.O);
 
-	// fp_preact_c3<<<512, 256>>>((float (*)[12][12])l_c2.output, (float (*)[6][6])l_c3.preact, (float (*)[2][2])l_c3.weight);
-	// fp_bias_c3<<<512, 256>>>((float (*)[6][6])l_c3.preact, l_c3.bias);
+	// fp_preact_c3<<<2048,1024>>>((float (*)[12][12])l_c2.output, (float (*)[6][6])l_c3.preact, (float (*)[2][2])l_c3.weight);
+	// fp_bias_c3<<<2048,1024>>>((float (*)[6][6])l_c3.preact, l_c3.bias);
 
-	// fp_add_res<<<512, 256>>>((float (*)[6][6])l_c3.preact, (float (*)[6][6])l_r.preact);
+	// fp_add_res<<<2048,1024>>>((float (*)[6][6])l_c3.preact, (float (*)[6][6])l_r.preact);
 	
-	// apply_sigmoid<<<512, 256>>>(l_c3.preact, l_c3.output, l_c3.O);
-	
-
-	// fp_preact_f<<<512, 256>>>((float (*)[6][6])l_c3.output, l_f.preact, (float (*)[6][6][6])l_f.weight);
-	// fp_bias_f<<<512, 256>>>(l_f.preact, l_f.bias);
-	// apply_sigmoid<<<512, 256>>>(l_f.preact, l_f.output, l_f.O);
-	
-	fp_preact_c1<<<512, 256>>>((float (*)[28][28])l_input.output, (float (*)[6][24][24])l_c1.preact, (float (*)[5][5])l_c1.weight);
-	fp_bias_c1<<<512, 256>>>((float (*)[6][24][24])l_c1.preact, l_c1.bias);
-	apply_sigmoid<<<512, 256>>>(l_c1.preact, l_c1.output, l_c1.O);
-
-	fp_preact_r<<<512, 256>>>((float (*)[6][24][24])l_c1.preact, (float (*)[6][6][6])l_r.preact, (float (*)[4][4])l_r.weight);
-	fp_bias_r<<<512, 256>>>((float (*)[6][6][6])l_r.preact, l_r.bias);
-
-	fp_preact_c2<<<512, 256>>>((float (*)[6][24][24])l_c1.output, (float (*)[6][12][12])l_c2.preact, (float (*)[2][2])l_c2.weight);
-	fp_bias_c2<<<512, 256>>>((float (*)[6][12][12])l_c2.preact, l_c2.bias);
-	apply_sigmoid<<<512, 256>>>(l_c2.preact, l_c2.output, l_c2.O);
-
-	fp_preact_c3<<<512, 256>>>((float (*)[6][12][12])l_c2.output, (float (*)[6][6][6])l_c3.preact, (float (*)[2][2])l_c3.weight);
-	fp_bias_c3<<<512, 256>>>((float (*)[6][6][6])l_c3.preact, l_c3.bias);
-
-	fp_add_res<<<512, 256>>>((float (*)[6][6][6])l_c3.preact, (float (*)[6][6][6])l_r.preact);
-	
-	apply_sigmoid<<<512, 256>>>(l_c3.preact, l_c3.output, l_c3.O);
+	// apply_sigmoid<<<2048,1024>>>(l_c3.preact, l_c3.output, l_c3.O);
 	
 
-	fp_preact_f<<<512, 256>>>((float (*)[6][6][6])l_c3.output, (float (*)[10])l_f.preact, (float (*)[6][6][6])l_f.weight);
-	fp_bias_f<<<512, 256>>>((float (*)[10])l_f.preact, l_f.bias);
-	apply_sigmoid<<<512, 256>>>(l_f.preact, l_f.output, l_f.O);
+	// fp_preact_f<<<2048,1024>>>((float (*)[6][6])l_c3.output, l_f.preact, (float (*)[6][6][6])l_f.weight);
+	// fp_bias_f<<<2048,1024>>>(l_f.preact, l_f.bias);
+	// apply_sigmoid<<<2048,1024>>>(l_f.preact, l_f.output, l_f.O);
+	
+	fp_preact_c1<<<2048,1024>>>((float (*)[28][28])l_input.output, (float (*)[6][24][24])l_c1.preact, (float (*)[5][5])l_c1.weight);
+	fp_bias_c1<<<2048,1024>>>((float (*)[6][24][24])l_c1.preact, l_c1.bias);
+	apply_sigmoid<<<2048,1024>>>(l_c1.preact, l_c1.output, l_c1.O);
+
+	fp_preact_r<<<2048,1024>>>((float (*)[6][24][24])l_c1.preact, (float (*)[6][6][6])l_r.preact, (float (*)[4][4])l_r.weight);
+	fp_bias_r<<<2048,1024>>>((float (*)[6][6][6])l_r.preact, l_r.bias);
+
+	fp_preact_c2<<<2048,1024>>>((float (*)[6][24][24])l_c1.output, (float (*)[6][12][12])l_c2.preact, (float (*)[2][2])l_c2.weight);
+	fp_bias_c2<<<2048,1024>>>((float (*)[6][12][12])l_c2.preact, l_c2.bias);
+	apply_sigmoid<<<2048,1024>>>(l_c2.preact, l_c2.output, l_c2.O);
+
+	fp_preact_c3<<<2048,1024>>>((float (*)[6][12][12])l_c2.output, (float (*)[6][6][6])l_c3.preact, (float (*)[2][2])l_c3.weight);
+	fp_bias_c3<<<2048,1024>>>((float (*)[6][6][6])l_c3.preact, l_c3.bias);
+
+	fp_add_res<<<2048,1024>>>((float (*)[6][6][6])l_c3.preact, (float (*)[6][6][6])l_r.preact);
+	
+	apply_sigmoid<<<2048,1024>>>(l_c3.preact, l_c3.output, l_c3.O);
+	
+
+	fp_preact_f<<<2048,1024>>>((float (*)[6][6][6])l_c3.output, (float (*)[10])l_f.preact, (float (*)[6][6][6])l_f.weight);
+	fp_bias_f<<<2048,1024>>>((float (*)[10])l_f.preact, l_f.bias);
+	apply_sigmoid<<<2048,1024>>>(l_f.preact, l_f.output, l_f.O);
 	
 	end = clock();
 	return ((double) (end - start)) / CLOCKS_PER_SEC;
@@ -137,53 +137,53 @@ static double back_pass()
 
 	start = clock();
 
-	// bp_weight_f<<<512, 256>>>((float (*)[6][6][6])l_f.d_weight, l_f.d_preact, (float (*)[6][6])l_c3.output);
-	// bp_bias_f<<<512, 256>>>(l_f.bias, l_f.d_preact);
+	// bp_weight_f<<<2048,1024>>>((float (*)[6][6][6])l_f.d_weight, l_f.d_preact, (float (*)[6][6])l_c3.output);
+	// bp_bias_f<<<2048,1024>>>(l_f.bias, l_f.d_preact);
 
-	// bp_output_c3<<<512, 256>>>((float (*)[6][6])l_c3.d_output, (float (*)[6][6][6])l_f.weight, l_f.d_preact);
-	// bp_preact_c3<<<512, 256>>>((float (*)[6][6])l_c3.d_preact, (float (*)[6][6])l_c3.d_output, (float (*)[6][6])l_c3.preact);
-	// bp_weight_c3<<<512, 256>>>((float (*)[2][2])l_c3.d_weight, (float (*)[6][6])l_c3.d_preact, (float (*)[12][12])l_c2.output);
-	// bp_bias_c3<<<512, 256>>>(l_c3.bias, (float (*)[6][6])l_c3.d_preact);
+	// bp_output_c3<<<2048,1024>>>((float (*)[6][6])l_c3.d_output, (float (*)[6][6][6])l_f.weight, l_f.d_preact);
+	// bp_preact_c3<<<2048,1024>>>((float (*)[6][6])l_c3.d_preact, (float (*)[6][6])l_c3.d_output, (float (*)[6][6])l_c3.preact);
+	// bp_weight_c3<<<2048,1024>>>((float (*)[2][2])l_c3.d_weight, (float (*)[6][6])l_c3.d_preact, (float (*)[12][12])l_c2.output);
+	// bp_bias_c3<<<2048,1024>>>(l_c3.bias, (float (*)[6][6])l_c3.d_preact);
 
-	// bp_output_c2<<<512, 256>>>((float (*)[12][12])l_c2.d_output, (float (*)[2][2])l_c3.weight, (float (*)[6][6])l_c3.d_preact);
-	// bp_preact_c2<<<512, 256>>>((float (*)[12][12])l_c2.d_preact, (float (*)[12][12])l_c2.d_output, (float (*)[12][12])l_c2.preact);
-	// bp_weight_c2<<<512, 256>>>((float (*)[2][2])l_c2.d_weight, (float (*)[12][12])l_c2.d_preact, (float (*)[24][24])l_c1.output);
-	// bp_bias_c2<<<512, 256>>>(l_c2.bias, (float (*)[12][12])l_c2.d_preact);
+	// bp_output_c2<<<2048,1024>>>((float (*)[12][12])l_c2.d_output, (float (*)[2][2])l_c3.weight, (float (*)[6][6])l_c3.d_preact);
+	// bp_preact_c2<<<2048,1024>>>((float (*)[12][12])l_c2.d_preact, (float (*)[12][12])l_c2.d_output, (float (*)[12][12])l_c2.preact);
+	// bp_weight_c2<<<2048,1024>>>((float (*)[2][2])l_c2.d_weight, (float (*)[12][12])l_c2.d_preact, (float (*)[24][24])l_c1.output);
+	// bp_bias_c2<<<2048,1024>>>(l_c2.bias, (float (*)[12][12])l_c2.d_preact);
 
-	// bp_output_c1<<<512, 256>>>((float (*)[24][24])l_c1.d_output, (float (*)[2][2])l_c2.weight, (float (*)[12][12])l_c2.d_preact);
-	// bp_preact_c1<<<512, 256>>>((float (*)[24][24])l_c1.d_preact, (float (*)[24][24])l_c1.d_output, (float (*)[24][24])l_c1.preact);
-	// bp_weight_c1<<<512, 256>>>((float (*)[5][5])l_c1.d_weight, (float (*)[24][24])l_c1.d_preact, (float (*)[28])l_input.output);
-	// bp_bias_c1<<<512, 256>>>(l_c1.bias, (float (*)[24][24])l_c1.d_preact);
+	// bp_output_c1<<<2048,1024>>>((float (*)[24][24])l_c1.d_output, (float (*)[2][2])l_c2.weight, (float (*)[12][12])l_c2.d_preact);
+	// bp_preact_c1<<<2048,1024>>>((float (*)[24][24])l_c1.d_preact, (float (*)[24][24])l_c1.d_output, (float (*)[24][24])l_c1.preact);
+	// bp_weight_c1<<<2048,1024>>>((float (*)[5][5])l_c1.d_weight, (float (*)[24][24])l_c1.d_preact, (float (*)[28])l_input.output);
+	// bp_bias_c1<<<2048,1024>>>(l_c1.bias, (float (*)[24][24])l_c1.d_preact);
 
 
-	// apply_grad<<<512, 256>>>(l_f.weight, l_f.d_weight, l_f.M * l_f.N);
-	// apply_grad<<<512, 256>>>(l_c2.weight, l_c2.d_weight, l_c2.M * l_c2.N);
-	// apply_grad<<<512, 256>>>(l_c1.weight, l_c1.d_weight, l_c1.M * l_c1.N);
+	// apply_grad<<<2048,1024>>>(l_f.weight, l_f.d_weight, l_f.M * l_f.N);
+	// apply_grad<<<2048,1024>>>(l_c2.weight, l_c2.d_weight, l_c2.M * l_c2.N);
+	// apply_grad<<<2048,1024>>>(l_c1.weight, l_c1.d_weight, l_c1.M * l_c1.N);
 
-	bp_weight_f<<<512, 256>>>((float (*)[6][6][6])l_f.d_weight, (float (*)[10])l_f.d_preact, (float (*)[6][6][6])l_c3.output);
-	bp_bias_f<<<512, 256>>>(l_f.bias, (float (*)[10])l_f.d_preact);
+	bp_weight_f<<<2048,1024>>>((float (*)[6][6][6])l_f.d_weight, (float (*)[10])l_f.d_preact, (float (*)[6][6][6])l_c3.output);
+	bp_bias_f<<<2048,1024>>>(l_f.bias, (float (*)[10])l_f.d_preact);
 	
-	bp_output_c3<<<512, 256>>>((float (*)[6][6][6])l_c3.d_output, (float (*)[6][6][6])l_f.weight, (float (*)[10])l_f.d_preact);
-	bp_preact_c3<<<512, 256>>>((float (*)[6][6][6])l_c3.d_preact, (float (*)[6][6][6])l_c3.d_output, (float (*)[6][6][6])l_c3.preact);
-	bp_weight_c3<<<512, 256>>>((float (*)[2][2])l_c3.d_weight, (float (*)[6][6][6])l_c3.d_preact, (float (*)[6][12][12])l_c2.output);
-	bp_bias_c3<<<512, 256>>>(l_c3.bias, (float (*)[6][6][6])l_c3.d_preact);
-
-	
-	bp_output_c2<<<512, 256>>>((float (*)[6][12][12])l_c2.d_output, (float (*)[2][2])l_c3.weight, (float (*)[6][6][6])l_c3.d_preact);
-	bp_preact_c2<<<512, 256>>>((float (*)[6][12][12])l_c2.d_preact, (float (*)[6][12][12])l_c2.d_output, (float (*)[6][12][12])l_c2.preact);
-	bp_weight_c2<<<512, 256>>>((float (*)[2][2])l_c2.d_weight, (float (*)[6][12][12])l_c2.d_preact, (float (*)[6][24][24])l_c1.output);
-	bp_bias_c2<<<512, 256>>>(l_c2.bias, (float (*)[6][12][12])l_c2.d_preact);
+	bp_output_c3<<<2048,1024>>>((float (*)[6][6][6])l_c3.d_output, (float (*)[6][6][6])l_f.weight, (float (*)[10])l_f.d_preact);
+	bp_preact_c3<<<2048,1024>>>((float (*)[6][6][6])l_c3.d_preact, (float (*)[6][6][6])l_c3.d_output, (float (*)[6][6][6])l_c3.preact);
+	bp_weight_c3<<<2048,1024>>>((float (*)[2][2])l_c3.d_weight, (float (*)[6][6][6])l_c3.d_preact, (float (*)[6][12][12])l_c2.output);
+	bp_bias_c3<<<2048,1024>>>(l_c3.bias, (float (*)[6][6][6])l_c3.d_preact);
 
 	
-	bp_output_c1<<<512, 256>>>((float (*)[6][24][24])l_c1.d_output, (float (*)[2][2])l_c2.weight, (float (*)[6][12][12])l_c2.d_preact);
-	bp_preact_c1<<<512, 256>>>((float (*)[6][24][24])l_c1.d_preact, (float (*)[6][24][24])l_c1.d_output, (float (*)[6][24][24])l_c1.preact);
-	bp_weight_c1<<<512, 256>>>((float (*)[5][5])l_c1.d_weight, (float (*)[6][24][24])l_c1.d_preact, (float (*)[28][28])l_input.output);
-	bp_bias_c1<<<512, 256>>>(l_c1.bias, (float (*)[6][24][24])l_c1.d_preact);
+	bp_output_c2<<<2048,1024>>>((float (*)[6][12][12])l_c2.d_output, (float (*)[2][2])l_c3.weight, (float (*)[6][6][6])l_c3.d_preact);
+	bp_preact_c2<<<2048,1024>>>((float (*)[6][12][12])l_c2.d_preact, (float (*)[6][12][12])l_c2.d_output, (float (*)[6][12][12])l_c2.preact);
+	bp_weight_c2<<<2048,1024>>>((float (*)[2][2])l_c2.d_weight, (float (*)[6][12][12])l_c2.d_preact, (float (*)[6][24][24])l_c1.output);
+	bp_bias_c2<<<2048,1024>>>(l_c2.bias, (float (*)[6][12][12])l_c2.d_preact);
+
+	
+	bp_output_c1<<<2048,1024>>>((float (*)[6][24][24])l_c1.d_output, (float (*)[2][2])l_c2.weight, (float (*)[6][12][12])l_c2.d_preact);
+	bp_preact_c1<<<2048,1024>>>((float (*)[6][24][24])l_c1.d_preact, (float (*)[6][24][24])l_c1.d_output, (float (*)[6][24][24])l_c1.preact);
+	bp_weight_c1<<<2048,1024>>>((float (*)[5][5])l_c1.d_weight, (float (*)[6][24][24])l_c1.d_preact, (float (*)[28][28])l_input.output);
+	bp_bias_c1<<<2048,1024>>>(l_c1.bias, (float (*)[6][24][24])l_c1.d_preact);
 
 
-	apply_grad<<<512, 256>>>(l_f.weight, l_f.d_weight, l_f.M * l_f.N);
-	apply_grad<<<512, 256>>>(l_c2.weight, l_c2.d_weight, l_c2.M * l_c2.N);
-	apply_grad<<<512, 256>>>(l_c1.weight, l_c1.d_weight, l_c1.M * l_c1.N);
+	apply_grad<<<2048,1024>>>(l_f.weight, l_f.d_weight, l_f.M * l_f.N);
+	apply_grad<<<2048,1024>>>(l_c2.weight, l_c2.d_weight, l_c2.M * l_c2.N);
+	apply_grad<<<2048,1024>>>(l_c1.weight, l_c1.d_weight, l_c1.M * l_c1.N);
 
 	end = clock();
 	return ((double) (end - start)) / CLOCKS_PER_SEC;
@@ -230,7 +230,7 @@ static void learn()
 			float tmp_err;
 
 			float input[batch_size][28][28];
-			unsigned int Y_host[batch_size];
+			unsigned int Y_host[batch_size] = {0};
 
 			for(int k = 0; k < batch_size; k++){
 				for (int i = 0; i < 28; ++i) {
@@ -248,7 +248,7 @@ static void learn()
 			l_c3.bp_clear();
 			
 
-			cudaMemset(Y, 0, sizeof(unsigned int) * batch_size);
+			// cudaMemset(Y, 0, sizeof(unsigned int) * batch_size);
 			cudaMemcpy(Y, Y_host, sizeof(unsigned int) * batch_size, cudaMemcpyHostToDevice);
 			makeError<<<batch_size, 10>>>(l_f.d_preact, l_f.output, Y, 10 * batch_size);
 	
@@ -256,7 +256,33 @@ static void learn()
 			err += tmp_err;
 
 			time_taken += back_pass();
+			// float weight_c1;
+			// float weight_c2;
+			// float weight_c3;
+			// float weight_c4;
+			// float weight_c5;
+			// float weight_c6;
+			// float weight_c7;
+			// float weight_c8;
+			
+			// cublasSnrm2(blas, 6*24*24, l_c1.weight, 1, &weight_c1);
+			// cublasSnrm2(blas, 6*2*2, l_c2.weight, 1, &weight_c2);
+			// cublasSnrm2(blas, 6*2*2, l_c3.weight, 1, &weight_c3);
+			// cublasSnrm2(blas, 10, l_c1.bias, 1, &weight_c4);
+			// cublasSnrm2(blas, 6, l_c2.bias, 1, &weight_c5);
+			// cublasSnrm2(blas, 6, l_c3.bias, 1, &weight_c6);
 
+			// cublasSnrm2(blas, 6*6*6*10, l_f.weight, 1, &weight_c7);
+			// cublasSnrm2(blas, 10, l_f.bias, 1, &weight_c8);
+
+			// fprintf(stdout, "\n c1: %f \n", weight_c1);
+			// fprintf(stdout, "\n c2: %f \n", weight_c2);
+			// fprintf(stdout, "\n c3: %f \n", weight_c3);
+			// fprintf(stdout, "\n c4: %f \n", weight_c4);
+			// fprintf(stdout, "\n c5: %f \n", weight_c5);
+			// fprintf(stdout, "\n c6: %f \n", weight_c6);
+			// fprintf(stdout, "\n c7: %f \n", weight_c7);
+			// fprintf(stdout, "\n c8: %f \n", weight_c8);
 			//fprintf(stdout, "\n %f \n", tmp_err);
 		}
 
@@ -265,7 +291,7 @@ static void learn()
 		double accuracy = 100 - double(err) * 100.0;
 		fprintf(stdout, "accuracy: %.2lf%% , time_on_gpu: %lf sec\n", accuracy, time_taken);
 
-		break;
+
 		if (err < threshold) {
 			fprintf(stdout, "Training complete, error less than threshold\n\n");
 			break;
@@ -328,16 +354,3 @@ static void test()
 	double err_percent = double(error) / double(test_cnt) * 100.0;
 	fprintf(stdout, "Error Rate: %.2lf%% , accuracy: %.2lf%%\n",err_percent,100-err_percent);
 }
-
-// static void test()
-// {
-// 	int error = 0;
-
-// 	for (int i = 0; i < test_cnt; ++i) {
-// 		if (classify(test_set[i].data) != test_set[i].label) {
-// 			++error;
-// 		}
-// 	}
-// 	double err_percent = double(error) / double(test_cnt) * 100.0;
-// 	fprintf(stdout, "Error Rate: %.2lf%% , accuracy: %.2lf%%\n",err_percent,100-err_percent);
-// }

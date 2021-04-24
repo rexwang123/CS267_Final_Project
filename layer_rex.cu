@@ -87,7 +87,8 @@ __global__ void apply_sigmoid(float *input, float *output, const int N)
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	for (int idx = N * pos / size; idx < N * (pos+1) / size; ++idx) {
+	int idx = pos;
+	if(idx < N) {
 		output[idx] = sigmoid(input[idx]);
 	}
 }
@@ -97,7 +98,7 @@ __global__ void makeError(float* err, float* output, unsigned int* Y, const int 
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	err[blockIdx.x * 10 + threadIdx.x] = ((Y[blockIdx.x] == threadIdx.x ? 1.0f : 0.0f) - output[threadIdx.x]);
+	err[blockIdx.x * 10 + threadIdx.x] = ((Y[blockIdx.x] == threadIdx.x ? 1.0f : 0.0f) - output[blockIdx.x * 10 + threadIdx.x]);
 }
 
 __global__ void apply_grad(float *output, float *grad, const int N)
@@ -105,7 +106,8 @@ __global__ void apply_grad(float *output, float *grad, const int N)
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	for (int idx = N * pos / size; idx < N * (pos+1) / size; ++idx) {
+	int idx = pos;
+	if(idx < N) {
 		output[idx] += dt * grad[idx];
 	}
 	
@@ -118,7 +120,8 @@ __global__ void fp_preact_c1(float input[batch_size][28][28], float preact[batch
 
 	const int N = batch_size * 5*5*6*24*24;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N){
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size) % 5);
@@ -140,7 +143,8 @@ __global__ void fp_bias_c1(float preact[batch_size][6][24][24], float bias[6])
 
 	const int N = batch_size * 6*24*24;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size) % 6);
@@ -159,7 +163,8 @@ __global__ void fp_preact_c2(float input[batch_size][6][24][24], float preact[ba
 
 	const int N = batch_size * 2*2*6*12*12;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N){
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size	) % 2);
@@ -179,7 +184,8 @@ __global__ void fp_bias_c2(float preact[batch_size][6][12][12], float bias[6])
 
 	const int N = batch_size * 6*12*12;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size) % 6);
@@ -198,7 +204,8 @@ __global__ void fp_preact_c3(float input[batch_size][6][12][12], float preact[ba
 
 	const int N = batch_size * 2*2*6*6*6;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size) % 2);
@@ -218,7 +225,8 @@ __global__ void fp_bias_c3(float preact[batch_size][6][6][6], float bias[6])
 
 	const int N = batch_size * 6*6*6;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size) % 6);
@@ -236,7 +244,8 @@ __global__ void fp_preact_f(float input[batch_size][6][6][6], float preact[batch
 
 	const int N = batch_size * 10*6*6*6;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size) % 10);
@@ -255,7 +264,8 @@ __global__ void fp_bias_f(float preact[batch_size][10], float bias[10])
 
 	const int N = batch_size * 10;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1) % batch_size);
 		const int i1 = ((idx /= batch_size) % 10);
@@ -270,7 +280,8 @@ __global__ void bp_weight_f(float d_weight[10][6][6][6], float d_preact[batch_si
 
 	const int N = batch_size * 10*6*6*6;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1) % batch_size);
 		const int i1 = ((idx /= batch_size) % 10);
@@ -294,7 +305,8 @@ __global__ void bp_bias_f(float bias[10], float d_preact[batch_size][10])
 	// 	bias[idx] += dt * d_preact[idx];
 	// }
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1) % batch_size);
 		const int i1 = ((idx /= batch_size) % 10);
@@ -311,7 +323,8 @@ __global__ void bp_output_c3(float d_output[batch_size][6][6][6], float n_weight
 
 	const int N = batch_size * 10*6*6*6;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1) % batch_size);
 		const int i1 = ((idx /= batch_size) % 10);
@@ -330,7 +343,8 @@ __global__ void bp_preact_c3(float d_preact[batch_size][6][6][6], float d_output
 
 	const int N = batch_size * 6*6*6;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1) % batch_size);
 		const int i1 = ((idx /= batch_size	) % 6);
@@ -351,7 +365,8 @@ __global__ void bp_weight_c3(float d_weight[6][2][2], float d_preact[batch_size]
 	const int N = batch_size * 6*2*2*6*6*6;
 	const float d = pow(6.0f, 3.0f);
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size	) % 6);
@@ -373,7 +388,8 @@ __global__ void bp_bias_c3(float bias[1], float d_preact[batch_size][6][6][6])
 	const int N = batch_size * 6*6*6;
 	const float d = pow(6.0f, 3.0f);
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N){
 		int idx = n;
 		const int i0 = ((idx /= 1) % batch_size);
 		const int i1 = ((idx /= batch_size ) % 6);
@@ -393,7 +409,8 @@ __global__ void bp_output_c2(float d_output[batch_size][6][12][12], float n_weig
 
 	const int N = batch_size * 6*2*2*6*6*6;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N){
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size	) % 6);
@@ -415,7 +432,8 @@ __global__ void bp_preact_c2(float d_preact[batch_size][6][12][12], float d_outp
 
 	const int N = batch_size * 6*12*12;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size	) % 6);
@@ -437,7 +455,8 @@ __global__ void bp_weight_c2(float d_weight[6][2][2], float d_preact[batch_size]
 	const int N = batch_size * 6*2*2*12*12;
 	const float d = pow(6.0f, 3.0f);
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N){
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size	) % 6);
@@ -459,14 +478,15 @@ __global__ void bp_bias_c2(float bias[6], float d_preact[batch_size][6][12][12])
 	const int N = batch_size * 6*12*12;
 	const float d = pow(6.0f, 3.0f);
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size	) % 6);
 		const int i2 = ((idx /= 6	) % 12);
 		const int i3 = ((idx /= 12	) % 12);
 
-		atomicAdd(&bias[i1], dt * d_preact[batch_size][i1][i2][i3] / d);
+		atomicAdd(&bias[i1], dt * d_preact[i0][i1][i2][i3] / d);
 	}
 }
 
@@ -479,7 +499,8 @@ __global__ void bp_output_c1(float d_output[batch_size][6][24][24], float n_weig
 
 	const int N = batch_size * 6*2*2*6*12*12;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size	) % 6);
@@ -500,7 +521,8 @@ __global__ void bp_preact_c1(float d_preact[batch_size][6][24][24], float d_outp
 
 	const int N = batch_size * 6*24*24;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N){
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size	) % 6);
@@ -521,7 +543,8 @@ __global__ void bp_weight_c1(float d_weight[6][5][5], float d_preact[batch_size]
 	const int N = batch_size * 6*5*5*24*24;
 	const float d = pow(24.0f, 2.0f);
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size	) % 6);
@@ -542,14 +565,15 @@ __global__ void bp_bias_c1(float bias[6], float d_preact[batch_size][6][24][24])
 	const int N = batch_size * 6*24*24;
 	const float d = pow(24.0f, 2.0f);
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size	) % 6);
 		const int i2 = ((idx /= 6	) % 24);
 		const int i3 = ((idx /= 24	) % 24);
 
-		atomicAdd(&bias[i1], dt * d_preact[batch_size][i1][i2][i3] / d);
+		atomicAdd(&bias[i1], dt * d_preact[i0][i1][i2][i3] / d);
 	}
 }
 
@@ -560,7 +584,8 @@ __global__ void fp_add_res(float preact1[batch_size][6][6][6],float preact2[batc
 	const int N = batch_size * 6*6*6;
 	const float d = pow(6.0f, 3.0f);
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size	) % 6);
@@ -578,7 +603,8 @@ __global__ void fp_preact_r(float input[batch_size][6][24][24], float preact[bat
 
 	const int N = batch_size * 4*4*6*6*6;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size	) % 4);
@@ -598,7 +624,8 @@ __global__ void fp_bias_r(float preact[batch_size][6][6][6], float bias[1])
 
 	const int N = batch_size * 6*6*6;
 
-	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
+	int n = pos;
+	if(n < N) {
 		int idx = n;
 		const int i0 = ((idx /= 1	) % batch_size);
 		const int i1 = ((idx /= batch_size	) % 6);
