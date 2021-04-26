@@ -74,6 +74,7 @@ int main(int argc, const  char **argv)
 {
 	srand(time(NULL));
 
+	fprintf(stdout ,"begin\n");
 	CUresult err = cuInit(0);
 	if (err != CUDA_SUCCESS) {
 		fprintf(stderr, "CUDA initialisation failed with error code - %d\n", err);
@@ -188,6 +189,7 @@ static void unfold_input(double input[28][28], double unfolded[24*24][5*5])
 
 static void learn()
 {
+	// train_cnt = 60000;
 	cudaGetDeviceCount(&deviceCount);
 	omp_set_num_threads(deviceCount);
 
@@ -258,7 +260,7 @@ static void learn()
 			unsigned int* Y;
 			cudaMalloc(&Y, sizeof(unsigned int) * batch_size);
 			int batch_cnt = train_cnt / batch_size;
-			for (int q = 0; q < batch_cnt; q+=2) {
+			for (int q = 0; q < batch_cnt; q+=deviceCount) {
 				float tmp_err;
 				int p = q + tid;
 				float input[batch_size][28][28];
