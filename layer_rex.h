@@ -10,7 +10,7 @@
 
 const static float dt = 1.0E-01f;
 const static float threshold = 1.0E-02f;
-const static int batch_size = 8;
+const static int batch_size = 100;
 
 class Layer {
 	public:

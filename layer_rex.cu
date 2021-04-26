@@ -14,14 +14,14 @@ Layer::Layer(int M, int N, int O)
 	preact = NULL;
 	bias   = NULL;
 	weight = NULL;
-
+	srand (1);
 	for (int i = 0; i < N; ++i) {
 		h_bias[i] = 0.5f - float(rand()) / float(RAND_MAX);
-		/*h_bias[i] = 0.0f;*/
+		// h_bias[i] = 0.0f;
 
 		for (int j = 0; j < M; ++j) {
 			h_weight[i][j] = 0.5f - float(rand()) / float(RAND_MAX);
-			/*h_weight[i][j] = 0.05f;*/
+			// h_weight[i][j] = 0.00f;
 		}
 	}
 
@@ -29,7 +29,6 @@ Layer::Layer(int M, int N, int O)
 	cudaMalloc(&preact, sizeof(float) * O);
 
 	cudaMalloc(&bias, sizeof(float) * N);
-
 	cudaMalloc(&weight, sizeof(float) * M * N);
 
 	cudaMalloc(&d_output, sizeof(float) * O);
@@ -119,7 +118,8 @@ __global__ void apply_grad(float *output, float *grad, const int N)
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		output[idx] += dt * grad[idx];
+		// output[idx] += dt * grad[idx];
+		atomicAdd(&output[idx], dt * grad[idx]);
 
 		n++;
 		if(n == cnt + 1) break;
@@ -174,7 +174,8 @@ __global__ void fp_bias_c1(float preact[batch_size][6][24][24], float bias[6])
 		const int i2 = ((idx /= 6	) % 24);
 		const int i3 = ((idx /= 24	) % 24);
 
-		preact[i0][i1][i2][i3] += bias[i1];
+		// preact[i0][i1][i2][i3] += bias[i1];
+		atomicAdd(&preact[i0][i1][i2][i3], bias[i1]);
 
 		n++;
 		if(n == cnt + 1) break;
@@ -227,7 +228,8 @@ __global__ void fp_bias_c2(float preact[batch_size][6][12][12], float bias[6])
 		const int i2 = ((idx /= 6	) % 12);
 		const int i3 = ((idx /= 12	) % 12);
 
-		preact[i0][i1][i2][i3] += bias[i1];
+		// preact[i0][i1][i2][i3] += bias[i1];
+		atomicAdd(&preact[i0][i1][i2][i3], bias[i1]);
 
 		n++;
 		if(n == cnt + 1) break;
@@ -280,7 +282,8 @@ __global__ void fp_bias_c3(float preact[batch_size][6][6][6], float bias[6])
 		const int i2 = ((idx /= 6	) % 6);
 		const int i3 = ((idx /= 6	) % 6);
 
-		preact[i0][i1][i2][i3] += bias[i1];
+		// preact[i0][i1][i2][i3] += bias[i1];
+		atomicAdd(&preact[i0][i1][i2][i3],bias[i1]);
 		
 		n++;
 		if(n == cnt + 1) break;
@@ -328,7 +331,8 @@ __global__ void fp_bias_f(float preact[batch_size][10], float bias[10])
 		int idx = n * size + pos;
 		const int i0 = ((idx /= 1) % batch_size);
 		const int i1 = ((idx /= batch_size) % 10);
-		preact[i0][i1] += bias[i1];
+		// preact[i0][i1] += bias[i1];
+		atomicAdd(&preact[i0][i1], bias[i1]);
 
 		n++;
 		if(n == cnt + 1) break;
@@ -793,7 +797,8 @@ __global__ void fp_bias_r(float preact[batch_size][6][6][6], float bias[1])
 		const int i2 = ((idx /= 6	) % 6);
 		const int i3 = ((idx /= 6	) % 6);
 
-		preact[i0][i1][i2][i3] += bias[0];
+		// preact[i0][i1][i2][i3] += bias[0];
+		atomicAdd(&preact[i0][i1][i2][i3],bias[0]);
 
 		n++;
 		if(n == cnt + 1) break;
