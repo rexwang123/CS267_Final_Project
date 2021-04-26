@@ -6,25 +6,61 @@
 #include <cuda.h>
 #include <cstdio>
 #include <time.h>
+#include <iostream>
+#include <string>
+#include <chrono>
+#include <vector>
+#include <omp.h>
 
 static mnist_data *train_set, *test_set;
 static unsigned int train_cnt, test_cnt;
 
-// Define layers of CNN
-static Layer l_input = Layer(0, 0, 28*28);
-static Layer l_c1 = Layer(5*5, 6, 24*24*6);
-static Layer l_c2 = Layer(2*2, 6, 12*12*6);
-static Layer l_c3 = Layer(2*2, 6, 6*6*6);
-static Layer l_f = Layer(6*6*6, 10, 10);
+static std::vector<Layer*> l_input;
+static std::vector<Layer*> l_c1;
+static std::vector<Layer*> l_c2;
+static std::vector<Layer*> l_c3;
+static std::vector<Layer*> l_f;
+static std::vector<Layer*> l_r;
 
-//resnet shortcut
-static Layer l_r = Layer(4*4,1,6*6*6);
+float* l_c1_weight;
+float* l_c2_weight;
+float* l_c3_weight;
+float* l_f_weight;
+float* l_r_weight;
+float* l_c1_bias;
+float* l_c2_bias;
+float* l_c3_bias;
+float* l_f_bias;
+float* l_r_bias;
+
+int deviceCount = 0;
 
 static void learn();
-static unsigned int classify(double data[28][28]);
-static void test();
-static double forward_pass(double data[28][28]);
-static double back_pass();
+static int* classify(float input[batch_size][28][28], int tid);
+static void test(int tid);
+static double forward_pass(float input[batch_size][28][28], int tid);
+static double back_pass(int tid);
+
+__global__ void weight_update(float* dest, float* weight, int N, int device_cnt)
+{
+	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
+	const int size = blockDim.x * gridDim.x;
+	
+	if(pos < N * device_cnt){
+		int idx = pos % N;
+		atomicAdd(&dest[idx], weight[pos]);
+	}
+}
+
+__global__ void weight_average(float* weight, int N, int device_cnt)
+{
+	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
+	const int size = blockDim.x * gridDim.x;
+	
+	if(pos < N){
+		weight[pos] /= device_cnt;
+	}
+}
 
 static inline void loaddata()
 {
@@ -46,92 +82,92 @@ int main(int argc, const  char **argv)
 
 	loaddata();
 	learn();
-	test();
+
+	fprintf(stdout, "begin test");
+	test(1);
 
 	return 0;
 }
 
 // Forward propagation of a single row in dataset
-static double forward_pass(double data[28][28])
+static double forward_pass(float input[batch_size][28][28], int tid)
 {
-	float input[28][28];
 
-	for (int i = 0; i < 28; ++i) {
-		for (int j = 0; j < 28; ++j) {
-			input[i][j] = data[i][j];
-		}
-	}
-
-	l_input.clear();
-	l_c1.clear();
-	l_c2.clear();
-	l_c3.clear();
-	l_f.clear();
-	l_r.clear();
+	l_input[tid]->clear();
+	l_c1[tid]->clear();
+	l_c2[tid]->clear();
+	l_c3[tid]->clear();
+	l_f[tid]->clear();
+	l_r[tid]->clear();
 	clock_t start, end;
 	start = clock();
 
-	l_input.setOutput((float *)input);
+	l_input[tid]->setOutput((float *)input);
+
+	fp_preact_c1<<<2048, 1024>>>((float (*)[28][28])l_input[tid]->output, (float (*)[6][24][24])l_c1[tid]->preact, (float (*)[5][5])l_c1[tid]->weight);
+	fp_bias_c1<<<2048, 1024>>>((float (*)[6][24][24])l_c1[tid]->preact, l_c1[tid]->bias);
+	apply_sigmoid<<<2048, 1024>>>(l_c1[tid]->preact, l_c1[tid]->output, l_c1[tid]->O);
+
+	fp_preact_r<<<2048, 1024>>>((float (*)[6][24][24])l_c1[tid]->preact, (float (*)[6][6][6])l_r[tid]->preact, (float (*)[4][4])l_r[tid]->weight);
+	fp_bias_r<<<2048, 1024>>>((float (*)[6][6][6])l_r[tid]->preact, l_r[tid]->bias);
+
+	fp_preact_c2<<<2048, 1024>>>((float (*)[6][24][24])l_c1[tid]->output, (float (*)[6][12][12])l_c2[tid]->preact, (float (*)[2][2])l_c2[tid]->weight);
+	fp_bias_c2<<<2048, 1024>>>((float (*)[6][12][12])l_c2[tid]->preact, l_c2[tid]->bias);
+	apply_sigmoid<<<2048, 1024>>>(l_c2[tid]->preact, l_c2[tid]->output, l_c2[tid]->O);
+
+	fp_preact_c3<<<2048, 1024>>>((float (*)[6][12][12])l_c2[tid]->output, (float (*)[6][6][6])l_c3[tid]->preact, (float (*)[2][2])l_c3[tid]->weight);
+	fp_bias_c3<<<2048, 1024>>>((float (*)[6][6][6])l_c3[tid]->preact, l_c3[tid]->bias);
+
+	fp_add_res<<<2048, 1024>>>((float (*)[6][6][6])l_c3[tid]->preact, (float (*)[6][6][6])l_r[tid]->preact);
 	
-	fp_preact_c1<<<128, 128>>>((float (*)[28])l_input.output, (float (*)[24][24])l_c1.preact, (float (*)[5][5])l_c1.weight);
-	fp_bias_c1<<<128, 128>>>((float (*)[24][24])l_c1.preact, l_c1.bias);
-	apply_sigmoid<<<128, 128>>>(l_c1.preact, l_c1.output, l_c1.O);
-
-	fp_preact_r<<<128, 128>>>((float (*)[24][24])l_c1.preact, (float (*)[6][6])l_r.preact, (float (*)[4][4])l_r.weight);
-	fp_bias_r<<<128, 128>>>((float (*)[6][6])l_r.preact, l_r.bias);
-
-	fp_preact_c2<<<128, 128>>>((float (*)[24][24])l_c1.output, (float (*)[12][12])l_c2.preact, (float (*)[2][2])l_c2.weight);
-	fp_bias_c2<<<128, 128>>>((float (*)[12][12])l_c2.preact, l_c2.bias);
-	apply_sigmoid<<<128, 128>>>(l_c2.preact, l_c2.output, l_c2.O);
-
-	fp_preact_c3<<<128, 128>>>((float (*)[12][12])l_c2.output, (float (*)[6][6])l_c3.preact, (float (*)[2][2])l_c3.weight);
-	fp_bias_c3<<<128, 128>>>((float (*)[6][6])l_c3.preact, l_c3.bias);
-
-	fp_add_res<<<128, 128>>>((float (*)[6][6])l_c3.preact, (float (*)[6][6])l_r.preact);
-	
-	apply_sigmoid<<<128, 128>>>(l_c3.preact, l_c3.output, l_c3.O);
+	apply_sigmoid<<<2048, 1024>>>(l_c3[tid]->preact, l_c3[tid]->output, l_c3[tid]->O);
 	
 
-	fp_preact_f<<<128, 128>>>((float (*)[6][6])l_c3.output, l_f.preact, (float (*)[6][6][6])l_f.weight);
-	fp_bias_f<<<128, 128>>>(l_f.preact, l_f.bias);
-	apply_sigmoid<<<128, 128>>>(l_f.preact, l_f.output, l_f.O);
+	fp_preact_f<<<2048, 1024>>>((float (*)[6][6][6])l_c3[tid]->output, (float (*)[10])l_f[tid]->preact, (float (*)[6][6][6])l_f[tid]->weight);
+	fp_bias_f<<<2048, 1024>>>((float (*)[10])l_f[tid]->preact, l_f[tid]->bias);
+	apply_sigmoid<<<2048, 1024>>>(l_f[tid]->preact, l_f[tid]->output, l_f[tid]->O);
 	
 	end = clock();
 	return ((double) (end - start)) / CLOCKS_PER_SEC;
 }
 
 // Back propagation to update weights
-static double back_pass()
+static double back_pass(int tid)
 {
+	// fprintf(stdout, "start backward\n");
+	//fprintf(stdout, "\n here \n");
 	clock_t start, end;
 
 	start = clock();
 
-	bp_weight_f<<<128, 128>>>((float (*)[6][6][6])l_f.d_weight, l_f.d_preact, (float (*)[6][6])l_c3.output);
-	bp_bias_f<<<128, 128>>>(l_f.bias, l_f.d_preact);
+	bp_weight_f<<<2048, 1024>>>((float (*)[6][6][6])l_f[tid]->d_weight, (float (*)[10])l_f[tid]->d_preact, (float (*)[6][6][6])l_c3[tid]->output);
+	bp_bias_f<<<2048, 1024>>>(l_f[tid]->bias, (float (*)[10])l_f[tid]->d_preact);
+	
+	bp_output_c3<<<2048, 1024>>>((float (*)[6][6][6])l_c3[tid]->d_output, (float (*)[6][6][6])l_f[tid]->weight, (float (*)[10])l_f[tid]->d_preact);
+	bp_preact_c3<<<2048, 1024>>>((float (*)[6][6][6])l_c3[tid]->d_preact, (float (*)[6][6][6])l_c3[tid]->d_output, (float (*)[6][6][6])l_c3[tid]->preact);
+	bp_weight_c3<<<2048, 1024>>>((float (*)[2][2])l_c3[tid]->d_weight, (float (*)[6][6][6])l_c3[tid]->d_preact, (float (*)[6][12][12])l_c2[tid]->output);
+	bp_bias_c3<<<2048, 1024>>>(l_c3[tid]->bias, (float (*)[6][6][6])l_c3[tid]->d_preact);
 
-	bp_output_c3<<<128, 128>>>((float (*)[6][6])l_c3.d_output, (float (*)[6][6][6])l_f.weight, l_f.d_preact);
-	bp_preact_c3<<<128, 128>>>((float (*)[6][6])l_c3.d_preact, (float (*)[6][6])l_c3.d_output, (float (*)[6][6])l_c3.preact);
-	bp_weight_c3<<<128, 128>>>((float (*)[2][2])l_c3.d_weight, (float (*)[6][6])l_c3.d_preact, (float (*)[12][12])l_c2.output);
-	bp_bias_c3<<<128, 128>>>(l_c3.bias, (float (*)[6][6])l_c3.d_preact);
+	
+	bp_output_c2<<<2048, 1024>>>((float (*)[6][12][12])l_c2[tid]->d_output, (float (*)[2][2])l_c3[tid]->weight, (float (*)[6][6][6])l_c3[tid]->d_preact);
+	bp_preact_c2<<<2048, 1024>>>((float (*)[6][12][12])l_c2[tid]->d_preact, (float (*)[6][12][12])l_c2[tid]->d_output, (float (*)[6][12][12])l_c2[tid]->preact);
+	bp_weight_c2<<<2048, 1024>>>((float (*)[2][2])l_c2[tid]->d_weight, (float (*)[6][12][12])l_c2[tid]->d_preact, (float (*)[6][24][24])l_c1[tid]->output);
+	bp_bias_c2<<<2048, 1024>>>(l_c2[tid]->bias, (float (*)[6][12][12])l_c2[tid]->d_preact);
 
-	bp_output_c2<<<128, 128>>>((float (*)[12][12])l_c2.d_output, (float (*)[2][2])l_c3.weight, (float (*)[6][6])l_c3.d_preact);
-	bp_preact_c2<<<128, 128>>>((float (*)[12][12])l_c2.d_preact, (float (*)[12][12])l_c2.d_output, (float (*)[12][12])l_c2.preact);
-	bp_weight_c2<<<128, 128>>>((float (*)[2][2])l_c2.d_weight, (float (*)[12][12])l_c2.d_preact, (float (*)[24][24])l_c1.output);
-	bp_bias_c2<<<128, 128>>>(l_c2.bias, (float (*)[12][12])l_c2.d_preact);
-
-	bp_output_c1<<<128, 128>>>((float (*)[24][24])l_c1.d_output, (float (*)[2][2])l_c2.weight, (float (*)[12][12])l_c2.d_preact);
-	bp_preact_c1<<<128, 128>>>((float (*)[24][24])l_c1.d_preact, (float (*)[24][24])l_c1.d_output, (float (*)[24][24])l_c1.preact);
-	bp_weight_c1<<<128, 128>>>((float (*)[5][5])l_c1.d_weight, (float (*)[24][24])l_c1.d_preact, (float (*)[28])l_input.output);
-	bp_bias_c1<<<128, 128>>>(l_c1.bias, (float (*)[24][24])l_c1.d_preact);
+	
+	bp_output_c1<<<2048, 1024>>>((float (*)[6][24][24])l_c1[tid]->d_output, (float (*)[2][2])l_c2[tid]->weight, (float (*)[6][12][12])l_c2[tid]->d_preact);
+	bp_preact_c1<<<2048, 1024>>>((float (*)[6][24][24])l_c1[tid]->d_preact, (float (*)[6][24][24])l_c1[tid]->d_output, (float (*)[6][24][24])l_c1[tid]->preact);
+	bp_weight_c1<<<2048, 1024>>>((float (*)[5][5])l_c1[tid]->d_weight, (float (*)[6][24][24])l_c1[tid]->d_preact, (float (*)[28][28])l_input[tid]->output);
+	bp_bias_c1<<<2048, 1024>>>(l_c1[tid]->bias, (float (*)[6][24][24])l_c1[tid]->d_preact);
 
 
-	apply_grad<<<128, 128>>>(l_f.weight, l_f.d_weight, l_f.M * l_f.N);
-	apply_grad<<<128, 128>>>(l_c2.weight, l_c2.d_weight, l_c2.M * l_c2.N);
-	apply_grad<<<128, 128>>>(l_c1.weight, l_c1.d_weight, l_c1.M * l_c1.N);
+	apply_grad<<<2048, 1024>>>(l_f[tid]->weight, l_f[tid]->d_weight, l_f[tid]->M * l_f[tid]->N);
+	apply_grad<<<2048, 1024>>>(l_c2[tid]->weight, l_c2[tid]->d_weight, l_c2[tid]->M * l_c2[tid]->N);
+	apply_grad<<<2048, 1024>>>(l_c1[tid]->weight, l_c1[tid]->d_weight, l_c1[tid]->M * l_c1[tid]->N);
 
 	end = clock();
 	return ((double) (end - start)) / CLOCKS_PER_SEC;
+
 }
 
 // Unfold the input layer
@@ -152,8 +188,16 @@ static void unfold_input(double input[28][28], double unfolded[24*24][5*5])
 
 static void learn()
 {
-	static cublasHandle_t blas;
-	cublasCreate(&blas);
+	cudaGetDeviceCount(&deviceCount);
+	omp_set_num_threads(deviceCount);
+
+	cublasHandle_t blas[deviceCount];
+	l_input = std::vector<Layer*>(deviceCount);
+	l_c1 = std::vector<Layer*>(deviceCount);
+	l_c2 = std::vector<Layer*>(deviceCount);
+	l_c3 = std::vector<Layer*>(deviceCount);
+	l_f = std::vector<Layer*>(deviceCount);
+	l_r = std::vector<Layer*>(deviceCount);
 
 	float err;
 	int iter = 20;
@@ -162,71 +206,226 @@ static void learn()
 
 	fprintf(stdout ,"Learning\n");
 
+
+	#pragma omp parallel num_threads(deviceCount) 
+	{
+		int i = omp_get_thread_num();
+		cudaSetDevice(i);
+		l_input[i] = new Layer(0, 0, 28*28 * batch_size);
+		l_c1[i] = new Layer(5*5, 6, 24*24*6 * batch_size);
+		l_c2[i] = new Layer(2*2, 6, 12*12*6 * batch_size);
+		l_c3[i] = new Layer(2*2, 6, 6*6*6 * batch_size);
+		l_f[i] = new Layer(6*6*6, 10, 10 * batch_size);
+		l_r[i] = new Layer(4*4,1,6*6*6 * batch_size);
+		cublasCreate(&blas[i]);
+
+		if(i == 0){
+			l_c1_weight = new float[5*5*6*(deviceCount-1)];
+			l_c2_weight = new float[2*2*6*(deviceCount-1)];
+			// l_c3_weight = new float[2*2*6*(deviceCount-1)];
+			l_f_weight = new float[6*6*6*10*(deviceCount-1)];
+			// l_r_weight = new float[4*4*1*(deviceCount-1)];
+
+			l_c1_bias = new float[6*(deviceCount-1)];
+			l_c2_bias = new float[6*(deviceCount-1)];
+			// l_c3_bias = new float[6*(deviceCount-1)];
+			l_f_bias = new float[10*(deviceCount-1)];
+			// l_r_bias = new float[1*(deviceCount-1)];
+			
+			cudaMalloc(&l_c1_weight, sizeof(float) * 5*5*6*(deviceCount-1));
+			cudaMalloc(&l_c2_weight, sizeof(float) * 2*2*6*(deviceCount-1));
+			// cudaMalloc(&l_c3_weight, sizeof(float) * 2*2*6*(deviceCount-1));
+			cudaMalloc(&l_f_weight, sizeof(float) * 6*6*6*10*(deviceCount-1));
+			// cudaMalloc(&l_r_weight, sizeof(float) * 4*4*1*(deviceCount-1));
+			cudaMalloc(&l_c1_bias, sizeof(float) * 6*(deviceCount-1));
+			cudaMalloc(&l_c2_bias, sizeof(float) * 6*(deviceCount-1));
+			// cudaMalloc(&l_c3_bias, sizeof(float) * 6*(deviceCount-1));
+			cudaMalloc(&l_f_bias, sizeof(float) * 10*(deviceCount-1));
+			// cudaMalloc(&l_r_bias, sizeof(float) * 1*(deviceCount-1));
+		}
+	}
+
+	cudaDeviceSynchronize();
+
+	
+	auto start_time = std::chrono::steady_clock::now();
 	while (iter < 0 || iter-- > 0) {
-		err = 0.0f;
+		#pragma omp parallel num_threads(deviceCount) 
+		{
+			err = 0.0f;
+			int tid = omp_get_thread_num();
+			cudaSetDevice(tid);
+			unsigned int* Y;
+			cudaMalloc(&Y, sizeof(unsigned int) * batch_size);
+			int batch_cnt = train_cnt / batch_size;
+			for (int q = 0; q < batch_cnt; q+=2) {
+				float tmp_err;
+				int p = q + tid;
+				float input[batch_size][28][28];
+				unsigned int Y_host[batch_size] = {0};
 
-		for (int i = 0; i < train_cnt; ++i) {
-			float tmp_err;
+				for(int k = 0; k < batch_size; k++){
+					for (int i = 0; i < 28; ++i) {
+						for (int j = 0; j < 28; ++j) {
+							input[k][i][j] = (train_set[p * batch_size + k].data)[i][j];
+						}
+					}
+					Y_host[k] = train_set[p * batch_size + k].label;
+				}
+				time_taken += forward_pass(input, tid);
 
-			time_taken += forward_pass(train_set[i].data);
+				l_f[tid]->bp_clear();
+				l_c2[tid]->bp_clear();
+				l_c1[tid]->bp_clear();
+				l_c3[tid]->bp_clear();
+				
 
-			l_f.bp_clear();
-			l_c2.bp_clear();
-			l_c1.bp_clear();
-			l_c3.bp_clear();
-			// Euclid distance of train_set[i]
-			makeError<<<10, 1>>>(l_f.d_preact, l_f.output, train_set[i].label, 10);
-			cublasSnrm2(blas, 10, l_f.d_preact, 1, &tmp_err);
-			err += tmp_err;
+				// cudaMemset(Y, 0, sizeof(unsigned int) * batch_size);
+				cudaMemcpy(Y, Y_host, sizeof(unsigned int) * batch_size, cudaMemcpyHostToDevice);
+				makeError<<<batch_size, 10>>>(l_f[tid]->d_preact, l_f[tid]->output, Y, 10 * batch_size);
+		
+				cublasSnrm2(blas[tid], 10 * batch_size, l_f[tid]->d_preact, 1, &tmp_err);
+				err += tmp_err;
 
-			time_taken += back_pass();
+				time_taken += back_pass(tid);
+				// fprintf(stdout, "device %d, finish iter %d \n", tid, p);
+			}
 		}
 
+		if(deviceCount > 0){
+			#pragma omp parallel num_threads(deviceCount) 
+			{
+				int tid = omp_get_thread_num();
+				cudaSetDevice(tid);
+
+				if(tid != 0){
+					cudaMemcpyPeer(&l_c1_weight[(tid-1) * l_c1[tid]->M * l_c1[tid]->N], 0, l_c1[tid]->weight, tid, sizeof(float) * l_c1[tid]->M * l_c1[tid]->N);
+					cudaMemcpyPeer(&l_c2_weight[(tid-1) * l_c2[tid]->M * l_c2[tid]->N], 0, l_c2[tid]->weight, tid, sizeof(float) * l_c2[tid]->M * l_c2[tid]->N);
+					// cudaMemcpyPeer(&l_c3_weight[(tid-1)* l_c3[tid]->M * l_c3[tid]->N], 0, l_c3[tid]->weight, tid, sizeof(float) * l_c3[tid]->M * l_c3[tid]->N);
+					cudaMemcpyPeer(&l_f_weight[(tid-1) * l_f[tid]->M * l_f[tid]->N], 0, l_f[tid]->weight, tid, sizeof(float) * l_f[tid]->M * l_f[tid]->N);
+					// // cudaMemcpyPeer(&l_r_weight[(tid-1) * l_r[tid]->M * l_r[tid]->N], 0, l_r[tid]->weight, tid, sizeof(float) * l_r[tid]->M * l_r[tid]->N);
+
+					cudaMemcpyPeer(&l_c1_bias[(tid-1) * l_c1[tid]->N], 0, l_c1[tid]->bias, tid, sizeof(float) * l_c1[tid]->N);
+					cudaMemcpyPeer(&l_c2_bias[(tid-1) * l_c2[tid]->N], 0, l_c2[tid]->bias, tid, sizeof(float) * l_c2[tid]->N);
+					// cudaMemcpyPeer(&l_c3_bias[(tid-1) * l_c3[tid]->N], 0, l_c3[tid]->bias, tid, sizeof(float) * l_c3[tid]->N);
+					cudaMemcpyPeer(&l_f_bias[(tid-1) * l_f[tid]->N], 0, l_f[tid]->bias, tid, sizeof(float) * l_f[tid]->N);
+					// cudaMemcpyPeer(&l_r_bias[(tid-1) * l_r[tid]->N], 0, l_r[tid]->bias, tid, sizeof(float) * l_r[tid]->N);
+				}
+
+				#pragma omp barrier
+				if(tid == 0){
+					weight_update<<<2048, 1024>>>(l_c1[tid]->weight, &l_c1_weight[tid * l_c1[tid]->M * l_c1[tid]->N], l_c1[tid]->M * l_c1[tid]->N, deviceCount-1);
+					weight_update<<<2048, 1024>>>(l_c2[tid]->weight, &l_c2_weight[tid * l_c2[tid]->M * l_c2[tid]->N], l_c2[tid]->M * l_c2[tid]->N, deviceCount-1);
+					// weight_update<<<2048, 1024>>>(l_c3[tid]->weight, &l_c3_weight[tid * l_c3[tid]->M * l_c3[tid]->N], l_c3[tid]->M * l_c3[tid]->N, deviceCount-1);
+					weight_update<<<2048, 1024>>>(l_f[tid]->weight, &l_f_weight[tid * l_f[tid]->M * l_f[tid]->N], l_f[tid]->M * l_f[tid]->N, deviceCount-1);
+					// // weight_update<<<2048, 1024>>>(l_r[tid]->weight, &l_r_weight[tid * l_r[tid]->M * l_r[tid]->N], l_r[tid]->M * l_r[tid]->N, deviceCount-1);
+
+					weight_update<<<2048, 1024>>>(l_c1[tid]->bias, &l_c1_bias[tid * l_c1[tid]->N], l_c1[tid]->N, deviceCount-1);
+					weight_update<<<2048, 1024>>>(l_c2[tid]->bias, &l_c2_bias[tid * l_c2[tid]->N], l_c2[tid]->N, deviceCount-1);
+					// weight_update<<<2048, 1024>>>(l_c3[tid]->bias, &l_c3_bias[tid * l_c3[tid]->N], l_c3[tid]->N, deviceCount-1);
+					weight_update<<<2048, 1024>>>(l_f[tid]->bias, &l_f_bias[tid * l_f[tid]->N], l_f[tid]->N, deviceCount-1);
+					// // weight_update<<<2048, 1024>>>(l_r[tid]->bias, &l_r_bias[tid * l_r[tid]->N], l_r[tid]->N, deviceCount-1);
+
+					weight_average<<<2048, 1024>>>(l_c1[tid]->weight, l_c1[tid]->M * l_c1[tid]->N, deviceCount);
+					weight_average<<<2048, 1024>>>(l_c2[tid]->weight, l_c2[tid]->M * l_c2[tid]->N, deviceCount);
+					// weight_average<<<2048, 1024>>>(l_c3[tid]->weight, l_c3[tid]->M * l_c3[tid]->N, deviceCount);
+					weight_average<<<2048, 1024>>>(l_f[tid]->weight, l_f[tid]->M * l_f[tid]->N, deviceCount);
+					// // weight_average<<<2048, 1024>>>(l_r[tid]->weight, l_r[tid]->M * l_r[tid]->N, deviceCount);
+
+					weight_average<<<2048, 1024>>>(l_c1[tid]->bias, l_c1[tid]->N, deviceCount);
+					weight_average<<<2048, 1024>>>(l_c2[tid]->bias, l_c2[tid]->N, deviceCount);
+					// weight_average<<<2048, 1024>>>(l_c3[tid]->bias, l_c3[tid]->N, deviceCount);
+					weight_average<<<2048, 1024>>>(l_f[tid]->bias, l_f[tid]->N, deviceCount);
+					// weight_average<<<2048, 1024>>>(l_r[tid]->bias, l_r[tid]->N, deviceCount);
+					
+					for(int j = 1; j < deviceCount; j++){
+						cudaMemcpyPeer(l_c1[j]->weight, j, l_c1[tid]->weight, tid, sizeof(float) * l_c1[tid]->M * l_c1[tid]->N);
+						cudaMemcpyPeer(l_c2[j]->weight, j, l_c2[tid]->weight, tid, sizeof(float) * l_c2[tid]->M * l_c2[tid]->N);
+						// cudaMemcpyPeer(l_c3[j]->weight, j, l_c3[tid]->weight, tid, sizeof(float) * l_c3[tid]->M * l_c3[tid]->N);
+						cudaMemcpyPeer(l_f[j]->weight, j, l_f[tid]->weight, tid, sizeof(float) * l_f[tid]->M * l_f[tid]->N);
+						// // cudaMemcpyPeer(l_r[j]->weight, j, l_r[tid]->weight, tid, sizeof(float) * l_r[tid]->M * l_r[tid]->N);
+
+						cudaMemcpyPeer(l_c1[j]->bias, j, l_c1[tid]->bias, tid, sizeof(float) * l_c1[tid]->N);
+						cudaMemcpyPeer(l_c2[j]->bias, j, l_c2[tid]->bias, tid, sizeof(float) * l_c2[tid]->N);
+						// cudaMemcpyPeer(l_c3[j]->bias, j, l_c3[tid]->bias, tid, sizeof(float) * l_c3[tid]->N);
+						cudaMemcpyPeer(l_f[j]->bias, j, l_f[tid]->bias, tid, sizeof(float) * l_f[tid]->N);
+						// cudaMemcpyPeer(l_r[j]->bias, j, l_r[tid]->bias, tid, sizeof(float) * l_r[tid]->N);
+					}
+				}
+			}
+		}
+		
+
+		fprintf(stdout, "\n finish iter %d \n", iter);
 		err /= train_cnt;
 		double accuracy = 100 - double(err) * 100.0;
 		fprintf(stdout, "accuracy: %.2lf%% , time_on_gpu: %lf sec\n", accuracy, time_taken);
+
 
 		if (err < threshold) {
 			fprintf(stdout, "Training complete, error less than threshold\n\n");
 			break;
 		}
-
 	}
-	
-	fprintf(stdout, "\n Time - %lf s\n", time_taken);
+
+
+
+	auto end_time = std::chrono::steady_clock::now();
+	std::chrono::duration<double> diff = end_time - start_time;
+	double seconds = diff.count();
+
+	fprintf(stdout, "\n Time - %lf s\n", seconds);
 }
 
 
 // Returns label of given data (0-9)
-static unsigned int classify(double data[28][28])
+static int* classify(float input[batch_size][28][28], int tid)
 {
-	float res[10];
+	float res[batch_size * 10];
 
-	forward_pass(data);
+	forward_pass(input, tid);
 
-	unsigned int max = 0;
+	int* max = new int[batch_size]{0};
 
-	cudaMemcpy(res, l_f.output, sizeof(float) * 10, cudaMemcpyDeviceToHost);
+	cudaMemcpy(&res[0], l_f[tid]->output, sizeof(float) * 10 * batch_size, cudaMemcpyDeviceToHost);
 
-	for (int i = 1; i < 10; ++i) {
-		if (res[max] < res[i]) {
-			max = i;
+	
+	for(int j = 0; j < batch_size; j++){
+		for (int i = 0; i < 10; i++) {
+			if (res[10 * j + max[j]] < res[10 * j + i]) {
+				max[j] = i;
+			}
 		}
 	}
-
+	
 	return max;
 }
 
 // Perform forward propagation of test data
-static void test()
+static void test(int tid)
 {
+	cudaSetDevice(tid);
 	int error = 0;
+	
+	int batch_cnt = test_cnt / batch_size;
+	for(int p = 0; p < batch_cnt; ++p){
+		float input[batch_size][28][28];
+		for(int k = 0; k < batch_size; ++k){
+			for (int i = 0; i < 28; ++i) {
+				for (int j = 0; j < 28; ++j) {
+					input[k][i][j] = (test_set[batch_size * p + k].data)[i][j];
+				}
+			}
+		}
 
-	for (int i = 0; i < test_cnt; ++i) {
-		if (classify(test_set[i].data) != test_set[i].label) {
-			++error;
+		int* max = classify(input, tid);
+		for (int i = 0; i < batch_size; ++i) {
+			if (max[i] != test_set[batch_size * p + i].label) {
+				++error;
+			}
 		}
 	}
+	
 	double err_percent = double(error) / double(test_cnt) * 100.0;
 	fprintf(stdout, "Error Rate: %.2lf%% , accuracy: %.2lf%%\n",err_percent,100-err_percent);
 }

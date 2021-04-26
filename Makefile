@@ -1,5 +1,5 @@
 all:
-	nvcc -lcuda -lcublas *.cu -o ResNet  -arch=sm_30 -Wno-deprecated-gpu-targets
+	nvcc -lcuda -lcublas --compiler-options -fopenmp layer.cu main.cu -o ResNet  -arch=sm_70 -Wno-deprecated-gpu-targets
 
 run:
 	./ResNet
