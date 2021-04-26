@@ -84,7 +84,7 @@ int main(int argc, const  char **argv)
 	learn();
 
 	fprintf(stdout, "begin test");
-	test(1);
+	test(0);
 
 	return 0;
 }
