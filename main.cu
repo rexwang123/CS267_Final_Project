@@ -36,9 +36,9 @@ float* l_r_bias;
 int deviceCount = 0;
 
 static void learn();
-static int* classify(float input[batch_size][28][28], int tid);
+static int* classify(float input[data_per_node][28][28], int tid);
 static void test(int tid);
-static double forward_pass(float input[batch_size][28][28], int tid);
+static double forward_pass(float input[data_per_node][28][28], int tid);
 static double back_pass(int tid);
 
 __global__ void weight_update(float* dest, float* d_weight, int N, int deviceCount)
@@ -102,7 +102,7 @@ int main(int argc, const  char **argv)
 }
 
 // Forward propagation of a single row in dataset
-static double forward_pass(float input[batch_size][28][28], int tid)
+static double forward_pass(float input[data_per_node][28][28], int tid)
 {
 
 	l_input[tid]->clear();
@@ -226,12 +226,12 @@ static void learn()
 	{
 		int i = omp_get_thread_num();
 		cudaSetDevice(i);
-		l_input[i] = new Layer(0, 0, 28*28 * batch_size);
-		l_c1[i] = new Layer(5*5, 6, 24*24*6 * batch_size);
-		l_c2[i] = new Layer(2*2, 6, 12*12*6 * batch_size);
-		l_c3[i] = new Layer(2*2, 6, 6*6*6 * batch_size);
-		l_f[i] = new Layer(6*6*6, 10, 10 * batch_size);
-		l_r[i] = new Layer(4*4,1,6*6*6 * batch_size);
+		l_input[i] = new Layer(0, 0, 28*28 * data_per_node);
+		l_c1[i] = new Layer(5*5, 6, 24*24*6 * data_per_node);
+		l_c2[i] = new Layer(2*2, 6, 12*12*6 * data_per_node);
+		l_c3[i] = new Layer(2*2, 6, 6*6*6 * data_per_node);
+		l_f[i] = new Layer(6*6*6, 10, 10 * data_per_node);
+		l_r[i] = new Layer(4*4,1,6*6*6 * data_per_node);
 		cublasCreate(&blas[i]);
 
 		if(i == 0){
@@ -271,21 +271,21 @@ static void learn()
 			int tid = omp_get_thread_num();
 			cudaSetDevice(tid);
 			unsigned int* Y;
-			cudaMalloc(&Y, sizeof(unsigned int) * batch_size);
-			int batch_cnt = train_cnt / batch_size;
+			cudaMalloc(&Y, sizeof(unsigned int) * data_per_node);
+			int batch_cnt = train_cnt / data_per_node;
 			for (int q = 0; q < batch_cnt; q+=deviceCount) {
 				float tmp_err;
 				int p = q + tid;
-				float input[batch_size][28][28];
-				unsigned int Y_host[batch_size] = {0};
+				float input[data_per_node][28][28];
+				unsigned int Y_host[data_per_node] = {0};
 
-				for(int k = 0; k < batch_size; k++){
+				for(int k = 0; k < data_per_node; k++){
 					for (int i = 0; i < 28; ++i) {
 						for (int j = 0; j < 28; ++j) {
-							input[k][i][j] = (train_set[p * batch_size + k].data)[i][j];
+							input[k][i][j] = (train_set[p * data_per_node + k].data)[i][j];
 						}
 					}
-					Y_host[k] = train_set[p * batch_size + k].label;
+					Y_host[k] = train_set[p * data_per_node + k].label;
 				}
 				time_taken += forward_pass(input, tid);
 
@@ -295,11 +295,11 @@ static void learn()
 				l_c3[tid]->bp_clear();
 				
 
-				// cudaMemset(Y, 0, sizeof(unsigned int) * batch_size);
-				cudaMemcpy(Y, Y_host, sizeof(unsigned int) * batch_size, cudaMemcpyHostToDevice);
-				makeError<<<batch_size, 10>>>(l_f[tid]->d_preact, l_f[tid]->output, Y, 10 * batch_size);
+				// cudaMemset(Y, 0, sizeof(unsigned int) * data_per_node);
+				cudaMemcpy(Y, Y_host, sizeof(unsigned int) * data_per_node, cudaMemcpyHostToDevice);
+				makeError<<<data_per_node, 10>>>(l_f[tid]->d_preact, l_f[tid]->output, Y, 10 * data_per_node);
 		
-				cublasSnrm2(blas[tid], 10 * batch_size, l_f[tid]->d_preact, 1, &tmp_err);
+				cublasSnrm2(blas[tid], 10 * data_per_node, l_f[tid]->d_preact, 1, &tmp_err);
 				err += tmp_err;
 
 				time_taken += back_pass(tid);
@@ -387,18 +387,18 @@ static void learn()
 
 
 // Returns label of given data (0-9)
-static int* classify(float input[batch_size][28][28], int tid)
+static int* classify(float input[data_per_node][28][28], int tid)
 {
-	float res[batch_size * 10];
+	float res[data_per_node * 10];
 
 	forward_pass(input, tid);
 
-	int* max = new int[batch_size]{0};
+	int* max = new int[data_per_node]{0};
 
-	cudaMemcpy(&res[0], l_f[tid]->output, sizeof(float) * 10 * batch_size, cudaMemcpyDeviceToHost);
+	cudaMemcpy(&res[0], l_f[tid]->output, sizeof(float) * 10 * data_per_node, cudaMemcpyDeviceToHost);
 
 	
-	for(int j = 0; j < batch_size; j++){
+	for(int j = 0; j < data_per_node; j++){
 		for (int i = 0; i < 10; i++) {
 			if (res[10 * j + max[j]] < res[10 * j + i]) {
 				max[j] = i;
@@ -415,20 +415,20 @@ static void test(int tid)
 	cudaSetDevice(tid);
 	int error = 0;
 	
-	int batch_cnt = test_cnt / batch_size;
+	int batch_cnt = test_cnt / data_per_node;
 	for(int p = 0; p < batch_cnt; ++p){
-		float input[batch_size][28][28];
-		for(int k = 0; k < batch_size; ++k){
+		float input[data_per_node][28][28];
+		for(int k = 0; k < data_per_node; ++k){
 			for (int i = 0; i < 28; ++i) {
 				for (int j = 0; j < 28; ++j) {
-					input[k][i][j] = (test_set[batch_size * p + k].data)[i][j];
+					input[k][i][j] = (test_set[data_per_node * p + k].data)[i][j];
 				}
 			}
 		}
 
 		int* max = classify(input, tid);
-		for (int i = 0; i < batch_size; ++i) {
-			if (max[i] != test_set[batch_size * p + i].label) {
+		for (int i = 0; i < data_per_node; ++i) {
+			if (max[i] != test_set[data_per_node * p + i].label) {
 				++error;
 			}
 		}

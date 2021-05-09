@@ -127,12 +127,12 @@ __global__ void apply_grad(float *output, float *grad, const int N)
 	
 }
 
-__global__ void fp_preact_c1(float input[batch_size][28][28], float preact[batch_size][6][24][24], float weight[6][5][5])
+__global__ void fp_preact_c1(float input[data_per_node][28][28], float preact[data_per_node][6][24][24], float weight[6][5][5])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 5*5*6*24*24;
+	const int N = data_per_node * 5*5*6*24*24;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -140,8 +140,8 @@ __global__ void fp_preact_c1(float input[batch_size][28][28], float preact[batch
 	int n = 0;
 	while(n < cnt || pos < remain){
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size) % 5);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node) % 5);
 		const int i2 = ((idx /= 5	) % 5);
 		const int i3 = ((idx /= 5	) % 6);
 		const int i4 = ((idx /= 6	) % 24);
@@ -156,12 +156,12 @@ __global__ void fp_preact_c1(float input[batch_size][28][28], float preact[batch
 
 
 
-__global__ void fp_bias_c1(float preact[batch_size][6][24][24], float bias[6])
+__global__ void fp_bias_c1(float preact[data_per_node][6][24][24], float bias[6])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*24*24;
+	const int N = data_per_node * 6*24*24;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -169,8 +169,8 @@ __global__ void fp_bias_c1(float preact[batch_size][6][24][24], float bias[6])
 	int n = 0;
 	while(n < cnt || pos < remain){
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size) % 6);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node) % 6);
 		const int i2 = ((idx /= 6	) % 24);
 		const int i3 = ((idx /= 24	) % 24);
 
@@ -183,12 +183,12 @@ __global__ void fp_bias_c1(float preact[batch_size][6][24][24], float bias[6])
 }
 
 
-__global__ void fp_preact_c2(float input[batch_size][6][24][24], float preact[batch_size][6][12][12], float weight[6][2][2])
+__global__ void fp_preact_c2(float input[data_per_node][6][24][24], float preact[data_per_node][6][12][12], float weight[6][2][2])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 2*2*6*12*12;
+	const int N = data_per_node * 2*2*6*12*12;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -196,8 +196,8 @@ __global__ void fp_preact_c2(float input[batch_size][6][24][24], float preact[ba
 	int n = 0;
 	while(n < cnt || pos < remain){
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size	) % 2);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node	) % 2);
 		const int i2 = ((idx /= 2	) % 2);
 		const int i3 = ((idx /= 2	) % 6);
 		const int i4 = ((idx /= 6	) % 12);
@@ -210,12 +210,12 @@ __global__ void fp_preact_c2(float input[batch_size][6][24][24], float preact[ba
 	}
 }
 
-__global__ void fp_bias_c2(float preact[batch_size][6][12][12], float bias[6])
+__global__ void fp_bias_c2(float preact[data_per_node][6][12][12], float bias[6])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*12*12;
+	const int N = data_per_node * 6*12*12;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -223,8 +223,8 @@ __global__ void fp_bias_c2(float preact[batch_size][6][12][12], float bias[6])
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size) % 6);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node) % 6);
 		const int i2 = ((idx /= 6	) % 12);
 		const int i3 = ((idx /= 12	) % 12);
 
@@ -237,12 +237,12 @@ __global__ void fp_bias_c2(float preact[batch_size][6][12][12], float bias[6])
 }
 
 
-__global__ void fp_preact_c3(float input[batch_size][6][12][12], float preact[batch_size][6][6][6], float weight[6][2][2])
+__global__ void fp_preact_c3(float input[data_per_node][6][12][12], float preact[data_per_node][6][6][6], float weight[6][2][2])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 2*2*6*6*6;
+	const int N = data_per_node * 2*2*6*6*6;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -250,8 +250,8 @@ __global__ void fp_preact_c3(float input[batch_size][6][12][12], float preact[ba
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size) % 2);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node) % 2);
 		const int i2 = ((idx /= 2	) % 2);
 		const int i3 = ((idx /= 2	) % 6);
 		const int i4 = ((idx /= 6	) % 6);
@@ -264,12 +264,12 @@ __global__ void fp_preact_c3(float input[batch_size][6][12][12], float preact[ba
 	}
 }
 
-__global__ void fp_bias_c3(float preact[batch_size][6][6][6], float bias[6])
+__global__ void fp_bias_c3(float preact[data_per_node][6][6][6], float bias[6])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*6*6;
+	const int N = data_per_node * 6*6*6;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -277,8 +277,8 @@ __global__ void fp_bias_c3(float preact[batch_size][6][6][6], float bias[6])
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size) % 6);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node) % 6);
 		const int i2 = ((idx /= 6	) % 6);
 		const int i3 = ((idx /= 6	) % 6);
 
@@ -290,12 +290,12 @@ __global__ void fp_bias_c3(float preact[batch_size][6][6][6], float bias[6])
 	}
 }
 
-__global__ void fp_preact_f(float input[batch_size][6][6][6], float preact[batch_size][10], float weight[10][6][6][6])
+__global__ void fp_preact_f(float input[data_per_node][6][6][6], float preact[data_per_node][10], float weight[10][6][6][6])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 10*6*6*6;
+	const int N = data_per_node * 10*6*6*6;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -303,8 +303,8 @@ __global__ void fp_preact_f(float input[batch_size][6][6][6], float preact[batch
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size) % 10);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node) % 10);
 		const int i2 = ((idx /= 10	) % 6);
 		const int i3 = ((idx /= 6	) % 6);
 		const int i4 = ((idx /= 6	) % 6);
@@ -316,12 +316,12 @@ __global__ void fp_preact_f(float input[batch_size][6][6][6], float preact[batch
 	}
 }
 
-__global__ void fp_bias_f(float preact[batch_size][10], float bias[10])
+__global__ void fp_bias_f(float preact[data_per_node][10], float bias[10])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 10;
+	const int N = data_per_node * 10;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -329,8 +329,8 @@ __global__ void fp_bias_f(float preact[batch_size][10], float bias[10])
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1) % batch_size);
-		const int i1 = ((idx /= batch_size) % 10);
+		const int i0 = ((idx /= 1) % data_per_node);
+		const int i1 = ((idx /= data_per_node) % 10);
 		// preact[i0][i1] += bias[i1];
 		atomicAdd(&preact[i0][i1], bias[i1]);
 
@@ -339,12 +339,12 @@ __global__ void fp_bias_f(float preact[batch_size][10], float bias[10])
 	}
 }
 
-__global__ void bp_weight_f(float d_weight[10][6][6][6], float d_preact[batch_size][10], float p_output[batch_size][6][6][6])
+__global__ void bp_weight_f(float d_weight[10][6][6][6], float d_preact[data_per_node][10], float p_output[data_per_node][6][6][6])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 10*6*6*6;
+	const int N = data_per_node * 10*6*6*6;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -352,8 +352,8 @@ __global__ void bp_weight_f(float d_weight[10][6][6][6], float d_preact[batch_si
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1) % batch_size);
-		const int i1 = ((idx /= batch_size) % 10);
+		const int i0 = ((idx /= 1) % data_per_node);
+		const int i1 = ((idx /= data_per_node) % 10);
 		const int i2 = ((idx /= 10	) % 6);
 		const int i3 = ((idx /= 6	) % 6);
 		const int i4 = ((idx /= 6	) % 6);
@@ -366,12 +366,12 @@ __global__ void bp_weight_f(float d_weight[10][6][6][6], float d_preact[batch_si
 	}
 }
 
-__global__ void bp_bias_f(float bias[10], float d_preact[batch_size][10])
+__global__ void bp_bias_f(float bias[10], float d_preact[data_per_node][10])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 10;
+	const int N = data_per_node * 10;
 
 	// for (int idx = N * pos / size; idx < N * (pos+1) / size; ++idx) {
 	// 	bias[idx] += dt * d_preact[idx];
@@ -383,8 +383,8 @@ __global__ void bp_bias_f(float bias[10], float d_preact[batch_size][10])
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1) % batch_size);
-		const int i1 = ((idx /= batch_size) % 10);
+		const int i0 = ((idx /= 1) % data_per_node);
+		const int i1 = ((idx /= data_per_node) % 10);
 
 		atomicAdd(&bias[i1], dt * d_preact[i0][i1]);
 		//bias[i1] += dt * d_preact[i0][i1];
@@ -394,12 +394,12 @@ __global__ void bp_bias_f(float bias[10], float d_preact[batch_size][10])
 	}
 }
 
-__global__ void bp_output_c3(float d_output[batch_size][6][6][6], float n_weight[10][6][6][6], float nd_preact[batch_size][10])
+__global__ void bp_output_c3(float d_output[data_per_node][6][6][6], float n_weight[10][6][6][6], float nd_preact[data_per_node][10])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 10*6*6*6;
+	const int N = data_per_node * 10*6*6*6;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -407,8 +407,8 @@ __global__ void bp_output_c3(float d_output[batch_size][6][6][6], float n_weight
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1) % batch_size);
-		const int i1 = ((idx /= batch_size) % 10);
+		const int i0 = ((idx /= 1) % data_per_node);
+		const int i1 = ((idx /= data_per_node) % 10);
 		const int i2 = ((idx /= 10	) % 6);
 		const int i3 = ((idx /= 6	) % 6);
 		const int i4 = ((idx /= 6	) % 6);
@@ -420,12 +420,12 @@ __global__ void bp_output_c3(float d_output[batch_size][6][6][6], float n_weight
 	}
 }
 
-__global__ void bp_preact_c3(float d_preact[batch_size][6][6][6], float d_output[batch_size][6][6][6], float preact[batch_size][6][6][6])
+__global__ void bp_preact_c3(float d_preact[data_per_node][6][6][6], float d_output[data_per_node][6][6][6], float preact[data_per_node][6][6][6])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*6*6;
+	const int N = data_per_node * 6*6*6;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -433,8 +433,8 @@ __global__ void bp_preact_c3(float d_preact[batch_size][6][6][6], float d_output
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1) % batch_size);
-		const int i1 = ((idx /= batch_size	) % 6);
+		const int i0 = ((idx /= 1) % data_per_node);
+		const int i1 = ((idx /= data_per_node	) % 6);
 		const int i2 = ((idx /= 6	) % 6);
 		const int i3 = ((idx /= 6	) % 6);
 
@@ -447,12 +447,12 @@ __global__ void bp_preact_c3(float d_preact[batch_size][6][6][6], float d_output
 	}
 }
 
-__global__ void bp_weight_c3(float d_weight[6][2][2], float d_preact[batch_size][6][6][6], float p_output[batch_size][6][12][12])
+__global__ void bp_weight_c3(float d_weight[6][2][2], float d_preact[data_per_node][6][6][6], float p_output[data_per_node][6][12][12])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*2*2*6*6*6;
+	const int N = data_per_node * 6*2*2*6*6*6;
 	const float d = pow(6.0f, 3.0f);
 
 	int cnt = N / size;
@@ -461,8 +461,8 @@ __global__ void bp_weight_c3(float d_weight[6][2][2], float d_preact[batch_size]
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size	) % 6);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node	) % 6);
 		const int i2 = ((idx /= 6	) % 2);
 		const int i3 = ((idx /= 2	) % 2);
 		const int i4 = ((idx /= 2	) % 6);
@@ -476,12 +476,12 @@ __global__ void bp_weight_c3(float d_weight[6][2][2], float d_preact[batch_size]
 	}
 }
 
-__global__ void bp_bias_c3(float bias[1], float d_preact[batch_size][6][6][6])
+__global__ void bp_bias_c3(float bias[1], float d_preact[data_per_node][6][6][6])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*6*6;
+	const int N = data_per_node * 6*6*6;
 	const float d = pow(6.0f, 3.0f);
 
 	int cnt = N / size;
@@ -490,8 +490,8 @@ __global__ void bp_bias_c3(float bias[1], float d_preact[batch_size][6][6][6])
 	int n = 0;
 	while(n < cnt || pos < remain){
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1) % batch_size);
-		const int i1 = ((idx /= batch_size ) % 6);
+		const int i0 = ((idx /= 1) % data_per_node);
+		const int i1 = ((idx /= data_per_node ) % 6);
 		const int i2 = ((idx /= 6	) % 6);
 		const int i3 = ((idx /= 6	) % 6);
 
@@ -504,12 +504,12 @@ __global__ void bp_bias_c3(float bias[1], float d_preact[batch_size][6][6][6])
 
 
 
-__global__ void bp_output_c2(float d_output[batch_size][6][12][12], float n_weight[6][2][2], float nd_preact[batch_size][6][6][6])
+__global__ void bp_output_c2(float d_output[data_per_node][6][12][12], float n_weight[6][2][2], float nd_preact[data_per_node][6][6][6])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*2*2*6*6*6;
+	const int N = data_per_node * 6*2*2*6*6*6;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -517,8 +517,8 @@ __global__ void bp_output_c2(float d_output[batch_size][6][12][12], float n_weig
 	int n = 0;
 	while(n < cnt || pos < remain){
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size	) % 6);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node	) % 6);
 		const int i2 = ((idx /= 6	) % 2);
 		const int i3 = ((idx /= 2	) % 2);
 		const int i4 = ((idx /= 2	) % 6);
@@ -533,12 +533,12 @@ __global__ void bp_output_c2(float d_output[batch_size][6][12][12], float n_weig
 }
 
 
-__global__ void bp_preact_c2(float d_preact[batch_size][6][12][12], float d_output[batch_size][6][12][12], float preact[batch_size][6][12][12])
+__global__ void bp_preact_c2(float d_preact[data_per_node][6][12][12], float d_output[data_per_node][6][12][12], float preact[data_per_node][6][12][12])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*12*12;
+	const int N = data_per_node * 6*12*12;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -546,8 +546,8 @@ __global__ void bp_preact_c2(float d_preact[batch_size][6][12][12], float d_outp
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size	) % 6);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node	) % 6);
 		const int i2 = ((idx /= 6	) % 12);
 		const int i3 = ((idx /= 12	) % 12);
 
@@ -561,12 +561,12 @@ __global__ void bp_preact_c2(float d_preact[batch_size][6][12][12], float d_outp
 	
 }
 
-__global__ void bp_weight_c2(float d_weight[6][2][2], float d_preact[batch_size][6][12][12], float p_output[batch_size][6][24][24])
+__global__ void bp_weight_c2(float d_weight[6][2][2], float d_preact[data_per_node][6][12][12], float p_output[data_per_node][6][24][24])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*2*2*12*12;
+	const int N = data_per_node * 6*2*2*12*12;
 	const float d = pow(6.0f, 3.0f);
 
 	int cnt = N / size;
@@ -575,8 +575,8 @@ __global__ void bp_weight_c2(float d_weight[6][2][2], float d_preact[batch_size]
 	int n = 0;
 	while(n < cnt || pos < remain){
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size	) % 6);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node	) % 6);
 		const int i2 = ((idx /= 6	) % 2);
 		const int i3 = ((idx /= 2	) % 2);
 		const int i4 = ((idx /= 2	) % 6);
@@ -590,12 +590,12 @@ __global__ void bp_weight_c2(float d_weight[6][2][2], float d_preact[batch_size]
 	}
 }
 
-__global__ void bp_bias_c2(float bias[6], float d_preact[batch_size][6][12][12])
+__global__ void bp_bias_c2(float bias[6], float d_preact[data_per_node][6][12][12])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*12*12;
+	const int N = data_per_node * 6*12*12;
 	const float d = pow(6.0f, 3.0f);
 
 	int cnt = N / size;
@@ -604,8 +604,8 @@ __global__ void bp_bias_c2(float bias[6], float d_preact[batch_size][6][12][12])
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size	) % 6);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node	) % 6);
 		const int i2 = ((idx /= 6	) % 12);
 		const int i3 = ((idx /= 12	) % 12);
 
@@ -618,12 +618,12 @@ __global__ void bp_bias_c2(float bias[6], float d_preact[batch_size][6][12][12])
 
 
 
-__global__ void bp_output_c1(float d_output[batch_size][6][24][24], float n_weight[6][2][2], float nd_preact[batch_size][6][12][12])
+__global__ void bp_output_c1(float d_output[data_per_node][6][24][24], float n_weight[6][2][2], float nd_preact[data_per_node][6][12][12])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*2*2*6*12*12;
+	const int N = data_per_node * 6*2*2*6*12*12;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -631,8 +631,8 @@ __global__ void bp_output_c1(float d_output[batch_size][6][24][24], float n_weig
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size	) % 6);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node	) % 6);
 		const int i2 = ((idx /= 6	) % 2);
 		const int i3 = ((idx /= 2	) % 2);
 		const int i4 = ((idx /= 2	) % 6);
@@ -646,12 +646,12 @@ __global__ void bp_output_c1(float d_output[batch_size][6][24][24], float n_weig
 	}
 }
 
-__global__ void bp_preact_c1(float d_preact[batch_size][6][24][24], float d_output[batch_size][6][24][24], float preact[batch_size][6][24][24])
+__global__ void bp_preact_c1(float d_preact[data_per_node][6][24][24], float d_output[data_per_node][6][24][24], float preact[data_per_node][6][24][24])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*24*24;
+	const int N = data_per_node * 6*24*24;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -659,8 +659,8 @@ __global__ void bp_preact_c1(float d_preact[batch_size][6][24][24], float d_outp
 	int n = 0;
 	while(n < cnt || pos < remain){
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size	) % 6);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node	) % 6);
 		const int i2 = ((idx /= 6	) % 24);
 		const int i3 = ((idx /= 24	) % 24);
 
@@ -673,12 +673,12 @@ __global__ void bp_preact_c1(float d_preact[batch_size][6][24][24], float d_outp
 	}
 }
 
-__global__ void bp_weight_c1(float d_weight[6][5][5], float d_preact[batch_size][6][24][24], float p_output[batch_size][28][28])
+__global__ void bp_weight_c1(float d_weight[6][5][5], float d_preact[data_per_node][6][24][24], float p_output[data_per_node][28][28])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*5*5*24*24;
+	const int N = data_per_node * 6*5*5*24*24;
 	const float d = pow(24.0f, 2.0f);
 
 	int cnt = N / size;
@@ -687,8 +687,8 @@ __global__ void bp_weight_c1(float d_weight[6][5][5], float d_preact[batch_size]
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size	) % 6);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node	) % 6);
 		const int i2 = ((idx /= 6	) % 5);
 		const int i3 = ((idx /= 5	) % 5);
 		const int i4 = ((idx /= 5	) % 24);
@@ -701,12 +701,12 @@ __global__ void bp_weight_c1(float d_weight[6][5][5], float d_preact[batch_size]
 	}
 }
 
-__global__ void bp_bias_c1(float bias[6], float d_preact[batch_size][6][24][24])
+__global__ void bp_bias_c1(float bias[6], float d_preact[data_per_node][6][24][24])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*24*24;
+	const int N = data_per_node * 6*24*24;
 	const float d = pow(24.0f, 2.0f);
 
 	int cnt = N / size;
@@ -715,8 +715,8 @@ __global__ void bp_bias_c1(float bias[6], float d_preact[batch_size][6][24][24])
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size	) % 6);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node	) % 6);
 		const int i2 = ((idx /= 6	) % 24);
 		const int i3 = ((idx /= 24	) % 24);
 
@@ -727,11 +727,11 @@ __global__ void bp_bias_c1(float bias[6], float d_preact[batch_size][6][24][24])
 	}
 }
 
-__global__ void fp_add_res(float preact1[batch_size][6][6][6],float preact2[batch_size][6][6][6])
+__global__ void fp_add_res(float preact1[data_per_node][6][6][6],float preact2[data_per_node][6][6][6])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
-	const int N = batch_size * 6*6*6;
+	const int N = data_per_node * 6*6*6;
 	const float d = pow(6.0f, 3.0f);
 
 	int cnt = N / size;
@@ -740,8 +740,8 @@ __global__ void fp_add_res(float preact1[batch_size][6][6][6],float preact2[batc
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size	) % 6);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node	) % 6);
 		const int i2 = ((idx /= 6	) % 6);
 		const int i3 = ((idx /= 6	) % 6);
 
@@ -752,12 +752,12 @@ __global__ void fp_add_res(float preact1[batch_size][6][6][6],float preact2[batc
 	}
 }
 
-__global__ void fp_preact_r(float input[batch_size][6][24][24], float preact[batch_size][6][6][6], float weight[1][4][4])
+__global__ void fp_preact_r(float input[data_per_node][6][24][24], float preact[data_per_node][6][6][6], float weight[1][4][4])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 4*4*6*6*6;
+	const int N = data_per_node * 4*4*6*6*6;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -765,8 +765,8 @@ __global__ void fp_preact_r(float input[batch_size][6][24][24], float preact[bat
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size	) % 4);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node	) % 4);
 		const int i2 = ((idx /= 4	) % 4);
 		const int i3 = ((idx /= 4	) % 6);
 		const int i4 = ((idx /= 6	) % 6);
@@ -779,12 +779,12 @@ __global__ void fp_preact_r(float input[batch_size][6][24][24], float preact[bat
 	}
 }
 
-__global__ void fp_bias_r(float preact[batch_size][6][6][6], float bias[1])
+__global__ void fp_bias_r(float preact[data_per_node][6][6][6], float bias[1])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = batch_size * 6*6*6;
+	const int N = data_per_node * 6*6*6;
 
 	int cnt = N / size;
 	int remain = N % size;
@@ -792,8 +792,8 @@ __global__ void fp_bias_r(float preact[batch_size][6][6][6], float bias[1])
 	int n = 0;
 	while(n < cnt || pos < remain) {
 		int idx = n * size + pos;
-		const int i0 = ((idx /= 1	) % batch_size);
-		const int i1 = ((idx /= batch_size	) % 6);
+		const int i0 = ((idx /= 1	) % data_per_node);
+		const int i1 = ((idx /= data_per_node	) % 6);
 		const int i2 = ((idx /= 6	) % 6);
 		const int i3 = ((idx /= 6	) % 6);
 
