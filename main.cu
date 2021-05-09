@@ -41,24 +41,35 @@ static void test(int tid);
 static double forward_pass(float input[batch_size][28][28], int tid);
 static double back_pass(int tid);
 
-__global__ void weight_update(float* dest, float* weight, int N, int device_cnt)
+__global__ void weight_update(float* dest, float* d_weight, int N, int deviceCount)
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 	
-	if(pos < N * device_cnt){
+	if(pos < N * (deviceCount-1)){
 		int idx = pos % N;
-		atomicAdd(&dest[idx], weight[pos]);
+		atomicAdd(&dest[idx], d_weight[pos]);
 	}
 }
 
-__global__ void weight_average(float* weight, int N, int device_cnt)
+__global__ void bias_update(float* dest, float* bias, int N, int deviceCount)
+{
+	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
+	const int size = blockDim.x * gridDim.x;
+	
+	if(pos < N * (deviceCount-1)){
+		int idx = pos % N;
+		atomicAdd(&dest[idx], bias[pos]);
+	}
+}
+
+__global__ void weight_average(float* weight, int N, int deviceCount)
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 	
 	if(pos < N){
-		weight[pos] /= device_cnt;
+		weight[pos] /= deviceCount;
 	}
 }
 
@@ -161,11 +172,6 @@ static double back_pass(int tid)
 	bp_weight_c1<<<2048, 1024>>>((float (*)[5][5])l_c1[tid]->d_weight, (float (*)[6][24][24])l_c1[tid]->d_preact, (float (*)[28][28])l_input[tid]->output);
 	bp_bias_c1<<<2048, 1024>>>(l_c1[tid]->bias, (float (*)[6][24][24])l_c1[tid]->d_preact);
 
-
-	apply_grad<<<2048, 1024>>>(l_f[tid]->weight, l_f[tid]->d_weight, l_f[tid]->M * l_f[tid]->N);
-	apply_grad<<<2048, 1024>>>(l_c2[tid]->weight, l_c2[tid]->d_weight, l_c2[tid]->M * l_c2[tid]->N);
-	apply_grad<<<2048, 1024>>>(l_c1[tid]->weight, l_c1[tid]->d_weight, l_c1[tid]->M * l_c1[tid]->N);
-
 	end = clock();
 	return ((double) (end - start)) / CLOCKS_PER_SEC;
 
@@ -189,7 +195,7 @@ static void unfold_input(double input[28][28], double unfolded[24*24][5*5])
 
 static void learn()
 {
-	// train_cnt = 60000;
+	// train_cnt = 15000;
 	cudaGetDeviceCount(&deviceCount);
 	omp_set_num_threads(deviceCount);
 
@@ -208,6 +214,13 @@ static void learn()
 
 	fprintf(stdout ,"Learning\n");
 
+	// int canAccess = 0;
+	// for(int i = 1; i < deviceCount; i++){
+	// 	cudaDeviceCanAccessPeer(&canAccess, 0, i);
+	// 	std::cout << canAccess << std::endl;
+	// 	cudaDeviceCanAccessPeer(&canAccess, i, 0);
+	// 	std::cout << canAccess << std::endl;
+	// }
 
 	#pragma omp parallel num_threads(deviceCount) 
 	{
@@ -291,72 +304,65 @@ static void learn()
 
 				time_taken += back_pass(tid);
 				// fprintf(stdout, "device %d, finish iter %d \n", tid, p);
-			}
-		}
-
-		if(deviceCount > 0){
-			#pragma omp parallel num_threads(deviceCount) 
-			{
-				int tid = omp_get_thread_num();
-				cudaSetDevice(tid);
-
-				if(tid != 0){
-					cudaMemcpyPeer(&l_c1_weight[(tid-1) * l_c1[tid]->M * l_c1[tid]->N], 0, l_c1[tid]->weight, tid, sizeof(float) * l_c1[tid]->M * l_c1[tid]->N);
-					cudaMemcpyPeer(&l_c2_weight[(tid-1) * l_c2[tid]->M * l_c2[tid]->N], 0, l_c2[tid]->weight, tid, sizeof(float) * l_c2[tid]->M * l_c2[tid]->N);
-					// cudaMemcpyPeer(&l_c3_weight[(tid-1)* l_c3[tid]->M * l_c3[tid]->N], 0, l_c3[tid]->weight, tid, sizeof(float) * l_c3[tid]->M * l_c3[tid]->N);
-					cudaMemcpyPeer(&l_f_weight[(tid-1) * l_f[tid]->M * l_f[tid]->N], 0, l_f[tid]->weight, tid, sizeof(float) * l_f[tid]->M * l_f[tid]->N);
-					// // cudaMemcpyPeer(&l_r_weight[(tid-1) * l_r[tid]->M * l_r[tid]->N], 0, l_r[tid]->weight, tid, sizeof(float) * l_r[tid]->M * l_r[tid]->N);
-
-					cudaMemcpyPeer(&l_c1_bias[(tid-1) * l_c1[tid]->N], 0, l_c1[tid]->bias, tid, sizeof(float) * l_c1[tid]->N);
-					cudaMemcpyPeer(&l_c2_bias[(tid-1) * l_c2[tid]->N], 0, l_c2[tid]->bias, tid, sizeof(float) * l_c2[tid]->N);
-					// cudaMemcpyPeer(&l_c3_bias[(tid-1) * l_c3[tid]->N], 0, l_c3[tid]->bias, tid, sizeof(float) * l_c3[tid]->N);
-					cudaMemcpyPeer(&l_f_bias[(tid-1) * l_f[tid]->N], 0, l_f[tid]->bias, tid, sizeof(float) * l_f[tid]->N);
-					// cudaMemcpyPeer(&l_r_bias[(tid-1) * l_r[tid]->N], 0, l_r[tid]->bias, tid, sizeof(float) * l_r[tid]->N);
-				}
-
+				
 				#pragma omp barrier
-				if(tid == 0){
-					weight_update<<<2048, 1024>>>(l_c1[tid]->weight, &l_c1_weight[tid * l_c1[tid]->M * l_c1[tid]->N], l_c1[tid]->M * l_c1[tid]->N, deviceCount-1);
-					weight_update<<<2048, 1024>>>(l_c2[tid]->weight, &l_c2_weight[tid * l_c2[tid]->M * l_c2[tid]->N], l_c2[tid]->M * l_c2[tid]->N, deviceCount-1);
-					// weight_update<<<2048, 1024>>>(l_c3[tid]->weight, &l_c3_weight[tid * l_c3[tid]->M * l_c3[tid]->N], l_c3[tid]->M * l_c3[tid]->N, deviceCount-1);
-					weight_update<<<2048, 1024>>>(l_f[tid]->weight, &l_f_weight[tid * l_f[tid]->M * l_f[tid]->N], l_f[tid]->M * l_f[tid]->N, deviceCount-1);
-					// // weight_update<<<2048, 1024>>>(l_r[tid]->weight, &l_r_weight[tid * l_r[tid]->M * l_r[tid]->N], l_r[tid]->M * l_r[tid]->N, deviceCount-1);
 
-					weight_update<<<2048, 1024>>>(l_c1[tid]->bias, &l_c1_bias[tid * l_c1[tid]->N], l_c1[tid]->N, deviceCount-1);
-					weight_update<<<2048, 1024>>>(l_c2[tid]->bias, &l_c2_bias[tid * l_c2[tid]->N], l_c2[tid]->N, deviceCount-1);
-					// weight_update<<<2048, 1024>>>(l_c3[tid]->bias, &l_c3_bias[tid * l_c3[tid]->N], l_c3[tid]->N, deviceCount-1);
-					weight_update<<<2048, 1024>>>(l_f[tid]->bias, &l_f_bias[tid * l_f[tid]->N], l_f[tid]->N, deviceCount-1);
-					// // weight_update<<<2048, 1024>>>(l_r[tid]->bias, &l_r_bias[tid * l_r[tid]->N], l_r[tid]->N, deviceCount-1);
+				if(deviceCount == 1){
+					apply_grad<<<2048, 1024>>>(l_f[tid]->weight, l_f[tid]->d_weight, l_f[tid]->M * l_f[tid]->N);
+					apply_grad<<<2048, 1024>>>(l_c2[tid]->weight, l_c2[tid]->d_weight, l_c2[tid]->M * l_c2[tid]->N);
+					apply_grad<<<2048, 1024>>>(l_c1[tid]->weight, l_c1[tid]->d_weight, l_c1[tid]->M * l_c1[tid]->N);
+				}
+				else{
+					int tid = omp_get_thread_num();
+					cudaSetDevice(tid);
+	
+					if(tid != 0){
+						cudaMemcpyPeer(&l_c1_weight[(tid-1) * l_c1[tid]->M * l_c1[tid]->N], 0, l_c1[tid]->d_weight, tid, sizeof(float) * l_c1[tid]->M * l_c1[tid]->N);
+						cudaMemcpyPeer(&l_c2_weight[(tid-1) * l_c2[tid]->M * l_c2[tid]->N], 0, l_c2[tid]->d_weight, tid, sizeof(float) * l_c2[tid]->M * l_c2[tid]->N);
+						cudaMemcpyPeer(&l_f_weight[(tid-1) * l_f[tid]->M * l_f[tid]->N], 0, l_f[tid]->d_weight, tid, sizeof(float) * l_f[tid]->M * l_f[tid]->N);
+						cudaMemcpyPeer(&l_c1_bias[(tid-1) * l_c1[tid]->N], 0, l_c1[tid]->bias, tid, sizeof(float) * l_c1[tid]->N);
+						cudaMemcpyPeer(&l_c2_bias[(tid-1) * l_c2[tid]->N], 0, l_c2[tid]->bias, tid, sizeof(float) * l_c2[tid]->N);
+						cudaMemcpyPeer(&l_f_bias[(tid-1) * l_f[tid]->N], 0, l_f[tid]->bias, tid, sizeof(float) * l_f[tid]->N);
+					}
+	
+					#pragma omp barrier
+					if(tid == 0){
+	
+						weight_update<<<2048, 1024>>>(l_c1[tid]->d_weight, l_c1_weight, l_c1[tid]->M * l_c1[tid]->N, deviceCount);
+						weight_update<<<2048, 1024>>>(l_c2[tid]->d_weight, l_c2_weight, l_c2[tid]->M * l_c2[tid]->N, deviceCount);
+						weight_update<<<2048, 1024>>>(l_f[tid]->d_weight, l_f_weight, l_f[tid]->M * l_f[tid]->N, deviceCount);
+						
+						weight_average<<<2048, 1024>>>(l_c1[tid]->d_weight, l_c1[tid]->M * l_c1[tid]->N, deviceCount);
+						weight_average<<<2048, 1024>>>(l_c2[tid]->d_weight, l_c2[tid]->M * l_c2[tid]->N, deviceCount);
+						weight_average<<<2048, 1024>>>(l_f[tid]->d_weight, l_f[tid]->M * l_f[tid]->N, deviceCount);
 
-					weight_average<<<2048, 1024>>>(l_c1[tid]->weight, l_c1[tid]->M * l_c1[tid]->N, deviceCount);
-					weight_average<<<2048, 1024>>>(l_c2[tid]->weight, l_c2[tid]->M * l_c2[tid]->N, deviceCount);
-					// weight_average<<<2048, 1024>>>(l_c3[tid]->weight, l_c3[tid]->M * l_c3[tid]->N, deviceCount);
-					weight_average<<<2048, 1024>>>(l_f[tid]->weight, l_f[tid]->M * l_f[tid]->N, deviceCount);
-					// // weight_average<<<2048, 1024>>>(l_r[tid]->weight, l_r[tid]->M * l_r[tid]->N, deviceCount);
-
-					weight_average<<<2048, 1024>>>(l_c1[tid]->bias, l_c1[tid]->N, deviceCount);
-					weight_average<<<2048, 1024>>>(l_c2[tid]->bias, l_c2[tid]->N, deviceCount);
-					// weight_average<<<2048, 1024>>>(l_c3[tid]->bias, l_c3[tid]->N, deviceCount);
-					weight_average<<<2048, 1024>>>(l_f[tid]->bias, l_f[tid]->N, deviceCount);
-					// weight_average<<<2048, 1024>>>(l_r[tid]->bias, l_r[tid]->N, deviceCount);
-					
-					for(int j = 1; j < deviceCount; j++){
-						cudaMemcpyPeer(l_c1[j]->weight, j, l_c1[tid]->weight, tid, sizeof(float) * l_c1[tid]->M * l_c1[tid]->N);
-						cudaMemcpyPeer(l_c2[j]->weight, j, l_c2[tid]->weight, tid, sizeof(float) * l_c2[tid]->M * l_c2[tid]->N);
-						// cudaMemcpyPeer(l_c3[j]->weight, j, l_c3[tid]->weight, tid, sizeof(float) * l_c3[tid]->M * l_c3[tid]->N);
-						cudaMemcpyPeer(l_f[j]->weight, j, l_f[tid]->weight, tid, sizeof(float) * l_f[tid]->M * l_f[tid]->N);
-						// // cudaMemcpyPeer(l_r[j]->weight, j, l_r[tid]->weight, tid, sizeof(float) * l_r[tid]->M * l_r[tid]->N);
-
-						cudaMemcpyPeer(l_c1[j]->bias, j, l_c1[tid]->bias, tid, sizeof(float) * l_c1[tid]->N);
-						cudaMemcpyPeer(l_c2[j]->bias, j, l_c2[tid]->bias, tid, sizeof(float) * l_c2[tid]->N);
-						// cudaMemcpyPeer(l_c3[j]->bias, j, l_c3[tid]->bias, tid, sizeof(float) * l_c3[tid]->N);
-						cudaMemcpyPeer(l_f[j]->bias, j, l_f[tid]->bias, tid, sizeof(float) * l_f[tid]->N);
-						// cudaMemcpyPeer(l_r[j]->bias, j, l_r[tid]->bias, tid, sizeof(float) * l_r[tid]->N);
+						apply_grad<<<2048, 1024>>>(l_f[tid]->weight, l_f[tid]->d_weight, l_f[tid]->M * l_f[tid]->N);
+						apply_grad<<<2048, 1024>>>(l_c2[tid]->weight, l_c2[tid]->d_weight, l_c2[tid]->M * l_c2[tid]->N);
+						apply_grad<<<2048, 1024>>>(l_c1[tid]->weight, l_c1[tid]->d_weight, l_c1[tid]->M * l_c1[tid]->N);
+	
+						bias_update<<<2048, 1024>>>(l_c1[tid]->bias, &l_c1_bias[tid * l_c1[tid]->N], l_c1[tid]->N, deviceCount);
+						bias_update<<<2048, 1024>>>(l_c2[tid]->bias, &l_c2_bias[tid * l_c2[tid]->N], l_c2[tid]->N, deviceCount);
+						bias_update<<<2048, 1024>>>(l_f[tid]->bias, &l_f_bias[tid * l_f[tid]->N], l_f[tid]->N, deviceCount);
+						
+						weight_average<<<2048, 1024>>>(l_c1[tid]->bias, l_c1[tid]->N, deviceCount);
+						weight_average<<<2048, 1024>>>(l_c2[tid]->bias, l_c2[tid]->N, deviceCount);
+						weight_average<<<2048, 1024>>>(l_f[tid]->bias, l_f[tid]->N, deviceCount);
+	
+						for(int j = 1; j < deviceCount; j++){
+							cudaMemcpyPeer(l_c1[j]->weight, j, l_c1[tid]->weight, tid, sizeof(float) * l_c1[tid]->M * l_c1[tid]->N);
+							cudaMemcpyPeer(l_c2[j]->weight, j, l_c2[tid]->weight, tid, sizeof(float) * l_c2[tid]->M * l_c2[tid]->N);
+							cudaMemcpyPeer(l_f[j]->weight, j, l_f[tid]->weight, tid, sizeof(float) * l_f[tid]->M * l_f[tid]->N);
+	
+							cudaMemcpyPeer(l_c1[j]->bias, j, l_c1[tid]->bias, tid, sizeof(float) * l_c1[tid]->N);
+							cudaMemcpyPeer(l_c2[j]->bias, j, l_c2[tid]->bias, tid, sizeof(float) * l_c2[tid]->N);
+							cudaMemcpyPeer(l_f[j]->bias, j, l_f[tid]->bias, tid, sizeof(float) * l_f[tid]->N);
+						}
 					}
 				}
-			}
+			}			
 		}
 		
+				
 
 		fprintf(stdout, "\n finish iter %d \n", iter);
 		err /= train_cnt;
