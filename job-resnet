@@ -1,0 +1,12 @@
+#!/bin/bash
+#SBATCH -A mp309
+#SBATCH -C gpu
+#SBATCH -q regular
+#SBATCH -t 1:00:00
+#SBATCH -n 1
+#SBATCH --exclusive
+#SBATCH -G 6
+#SBATCH -c 10
+
+export SLURM_CPU_BIND="cores"
+srun ./ResNet 
